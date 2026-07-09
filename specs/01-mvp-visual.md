@@ -1,6 +1,6 @@
 # SPEC 01 — MVP visual de Arcade Vault
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** (ninguno)
 > **Fecha:** 2026-07-09
 > **Objetivo:** Portar a Next.js App Router las cinco pantallas visuales de Arcade Vault (Biblioteca, Detalle, Reproductor, Auth y Salón de la Fama) del template estático en `references/templates/`, con navegación funcional entre rutas reales y datos mock, sin implementar lógica de juego real, sesión real ni backend.
@@ -81,21 +81,21 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] `npm run dev` levanta la app sin errores en consola.
-- [ ] La ruta `/` muestra el hero, el buscador/chips estáticos y una grilla con las 8 tarjetas de juego.
-- [ ] Cada tarjeta de `/` enlaza a `/juegos/[id]` con el id correspondiente.
-- [ ] `/juegos/[id]` muestra portada, tags, descripción, stat strip y leaderboard para cada uno de los 8 juegos.
-- [ ] `/juegos/no-existe` devuelve una página 404.
-- [ ] El botón "JUGAR AHORA" en Detalle navega a `/juegos/[id]/jugar`.
-- [ ] `/juegos/[id]/jugar` muestra el HUD y la arena CRT animada, y los botones PAUSA/FIN no producen ningún cambio visible al hacer clic.
-- [ ] El botón "SALIR" en Reproductor navega de vuelta a `/juegos/[id]`.
-- [ ] `/auth` permite escribir en todos los campos y alternar entre las pestañas "Iniciar sesión" y "Crear cuenta".
-- [ ] Ningún botón de envío, invitado o social en `/auth` navega ni cambia el estado del Nav.
-- [ ] `/salon-de-la-fama` muestra el podio (top 3) y la tabla completa de puntuaciones del primer juego del catálogo.
-- [ ] El Nav (links de escritorio y menú móvil) navega correctamente entre `/`, `/salon-de-la-fama` y `/auth` desde cualquier pantalla.
-- [ ] El menú hamburguesa móvil abre y cierra correctamente en viewport angosto (<840px).
-- [ ] El Nav siempre muestra el botón "Iniciar Sesión" (nunca un estado de sesión iniciada).
-- [ ] `npm run lint` pasa sin errores.
+- [X] `npm run dev` levanta la app sin errores en consola.
+- [X] La ruta `/` muestra el hero, el buscador/chips estáticos y una grilla con las 8 tarjetas de juego.
+- [X] Cada tarjeta de `/` enlaza a `/juegos/[id]` con el id correspondiente.
+- [X] `/juegos/[id]` muestra portada, tags, descripción, stat strip y leaderboard para cada uno de los 8 juegos.
+- [X] `/juegos/no-existe` devuelve una página 404.
+- [X] El botón "JUGAR AHORA" en Detalle navega a `/juegos/[id]/jugar`.
+- [X] `/juegos/[id]/jugar` muestra el HUD y la arena CRT animada, y los botones PAUSA/FIN no producen ningún cambio visible al hacer clic.
+- [X] El botón "SALIR" en Reproductor navega de vuelta a `/juegos/[id]`.
+- [X] `/auth` permite escribir en todos los campos y alternar entre las pestañas "Iniciar sesión" y "Crear cuenta".
+- [X] Ningún botón de envío, invitado o social en `/auth` navega ni cambia el estado del Nav.
+- [X] `/salon-de-la-fama` muestra el podio (top 3) y la tabla completa de puntuaciones del primer juego del catálogo.
+- [X] El Nav (links de escritorio y menú móvil) navega correctamente entre `/`, `/salon-de-la-fama` y `/auth` desde cualquier pantalla.
+- [X] El menú hamburguesa móvil abre y cierra correctamente en viewport angosto (<840px).
+- [X] El Nav siempre muestra el botón "Iniciar Sesión" (nunca un estado de sesión iniciada).
+- [X] `npm run lint` pasa sin errores.
 
 ## Decisiones
 
