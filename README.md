@@ -15,4 +15,11 @@ https://github.com/Klerith/fernando-skills
 npx skills@latest add Klerith/fernando-skills
 ```
 
-## Hola mundo test rama
+## Commands
+
+- `npm run dev` — start the dev server
+- `npm run build` — production build
+- `npm run start` — run a production build
+- `npm run lint` — ESLint (flat config: `eslint-config-next` core-web-vitals + typescript configs). Note the script is plain `eslint`, not `next lint`.
+
+No test runner is configured in this repo yet.
