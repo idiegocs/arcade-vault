@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-type NavTarget = "inicio" | "biblioteca" | "salon" | "auth";
+type NavTarget = "inicio" | "biblioteca" | "salon" | "acerca" | "auth";
 
 export function Nav() {
   const pathname = usePathname();
@@ -14,6 +14,7 @@ export function Nav() {
     if (target === "inicio") return pathname === "/";
     if (target === "biblioteca") return pathname === "/games" || pathname.startsWith("/juegos");
     if (target === "salon") return pathname === "/salon-de-la-fama";
+    if (target === "acerca") return pathname === "/about";
     return pathname === "/auth";
   };
 
@@ -37,6 +38,9 @@ export function Nav() {
           </Link>
           <Link href="/salon-de-la-fama" className={isActive("salon") ? "active" : ""}>
             Salón de la Fama
+          </Link>
+          <Link href="/about" className={isActive("acerca") ? "active" : ""}>
+            Acerca de
           </Link>
         </div>
         <div className="spacer" />
@@ -77,6 +81,9 @@ export function Nav() {
           onClick={close}
         >
           Salón de la Fama
+        </Link>
+        <Link href="/about" className={isActive("acerca") ? "active" : ""} onClick={close}>
+          Acerca de
         </Link>
         <Link href="/auth" className={isActive("auth") ? "active" : ""} onClick={close}>
           Iniciar Sesión
