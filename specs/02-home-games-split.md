@@ -1,6 +1,6 @@
 # SPEC 02 — Home separado de Biblioteca
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** 01-mvp-visual
 > **Fecha:** 2026-07-10
 > **Objetivo:** Separar la ruta `/` (que hoy muestra la Biblioteca de juegos) en dos pantallas: un Home tipo landing en `/` portado de `references/templates/home-about/home.jsx`, y la Biblioteca de juegos movida a una nueva ruta `/games`.
@@ -39,21 +39,20 @@ Este spec no introduce estructuras de datos nuevas. El Home consume `GAMES` ya e
 
 ## Criterios de aceptación
 
-- [ ] `npm run dev` levanta la app sin errores en consola.
-- [ ] La ruta `/` muestra el nuevo Home: hero con silhouettes flotantes, sección "¿Por qué Arcade Vault?", vitrina de juegos, stats, "Actividad en Vivo", precios y CTA final.
-- [ ] Al hacer scroll en `/`, las secciones con clase `reveal` aparecen animadas (se les agrega `in` al entrar en viewport).
-- [ ] El bloque de stats muestra `${GAMES.length}+` (es decir "8+") en vez de un valor hardcodeado desincronizado del catálogo.
-- [ ] La vitrina de juegos del Home muestra 6 tarjetas de `GAMES` y cada una enlaza a `/juegos/[id]` correspondiente.
-- [ ] Los botones "EXPLORAR JUEGOS", "VER TODOS LOS JUEGOS →" e "INSERTAR MONEDA →" navegan a `/games`.
-- [ ] Los botones "CREAR CUENTA" y "EMPEZAR GRATIS →" navegan a `/auth`.
-- [ ] El botón "VER SALÓN →" navega a `/salon-de-la-fama`.
-- [ ] `/games` muestra la Biblioteca (hero "ARCADE VAULT", buscador/chips estáticos, grilla de 8 tarjetas) idéntica a la que hoy vive en `/`.
-- [ ] Cada tarjeta de `/games` enlaza a `/juegos/[id]` con el id correspondiente (sin cambios respecto al comportamiento actual).
-- [ ] El Nav (escritorio y menú móvil) muestra los links "Inicio", "Biblioteca", "Salón de la Fama" e "Iniciar Sesión".
-- [ ] El link "Inicio" del Nav navega a `/` y se resalta solo cuando la ruta activa es `/` exacto.
-- [ ] El link "Biblioteca" del Nav navega a `/games` y se resalta en `/games`, `/juegos/[id]` y `/juegos/[id]/jugar`.
-- [ ] El menú hamburguesa móvil sigue abriendo/cerrando correctamente e incluye el nuevo link "Inicio".
-- [ ] `npm run lint` pasa sin errores.
+- [X] `npm run dev` levanta la app sin errores en consola.
+- [X] La ruta `/` muestra el nuevo Home: hero con silhouettes flotantes, sección "¿Por qué Arcade Vault?", vitrina de juegos, stats, "Actividad en Vivo", precios y CTA final.
+- [X] Al hacer scroll en `/`, las secciones con clase `reveal` aparecen animadas (se les agrega `in` al entrar en viewport).
+- [x] El bloque de stats muestra `${GAMES.length}+` (es decir "8+") en vez de un valor hardcodeado desincronizado del catálogo.
+- [X] Los botones "EXPLORAR JUEGOS", "VER TODOS LOS JUEGOS →" e "INSERTAR MONEDA →" navegan a `/games`.
+- [X] Los botones "CREAR CUENTA" y "EMPEZAR GRATIS →" navegan a `/auth`.
+- [X] El botón "VER SALÓN →" navega a `/salon-de-la-fama`.
+- [X] `/games` muestra la Biblioteca (hero "ARCADE VAULT", buscador/chips estáticos, grilla de 8 tarjetas) idéntica a la que hoy vive en `/`.
+- [X] Cada tarjeta de `/games` enlaza a `/juegos/[id]` con el id correspondiente (sin cambios respecto al comportamiento actual).
+- [X] El Nav (escritorio y menú móvil) muestra los links "Inicio", "Biblioteca", "Salón de la Fama" e "Iniciar Sesión".
+- [X] El link "Inicio" del Nav navega a `/` y se resalta solo cuando la ruta activa es `/` exacto.
+- [X] El link "Biblioteca" del Nav navega a `/games` y se resalta en `/games`, `/juegos/[id]` y `/juegos/[id]/jugar`.
+- [X] El menú hamburguesa móvil sigue abriendo/cerrando correctamente e incluye el nuevo link "Inicio".
+- [X] `npm run lint` pasa sin errores.
 
 ## Decisiones
 
