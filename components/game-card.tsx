@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Game } from "@/lib/data";
 
-export function GameCard({ game }: { game: Game }) {
+export function GameCard({ game, best }: { game: Game; best?: number | null }) {
   return (
     <Link href={`/juegos/${game.id}`} className="card">
       <div className="cover">
@@ -14,7 +14,7 @@ export function GameCard({ game }: { game: Game }) {
         <div className="row">
           <div className="score-badge">
             <span>MEJOR PUNTUACIÓN</span>
-            <b>{game.best.toLocaleString("es-ES")}</b>
+            <b>{best == null ? "SIN RÉCORD" : best.toLocaleString("es-ES")}</b>
           </div>
           <span
             className={`btn ${game.color === "magenta" ? "magenta" : game.color === "yellow" ? "yellow" : ""}`}

@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { signOut } from "@/app/actions/auth";
 
 type NavTarget = "inicio" | "biblioteca" | "salon" | "acerca" | "auth";
 
-export function Nav() {
+export function Nav({ username }: { username: string | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -48,9 +49,18 @@ export function Nav() {
           <span className="coin" />
           <span>CRÉDITOS · 03</span>
         </div>
-        <Link href="/auth" className="btn auth-btn">
-          Iniciar Sesión
-        </Link>
+        {username ? (
+          <form action={signOut} className="nav-session">
+            <span className="nav-username mono">{username.toUpperCase()}</span>
+            <button type="submit" className="btn ghost">
+              Salir
+            </button>
+          </form>
+        ) : (
+          <Link href="/auth" className="btn auth-btn">
+            Iniciar Sesión
+          </Link>
+        )}
         <button
           type="button"
           className="btn ghost hamburger"
@@ -61,10 +71,7 @@ export function Nav() {
         </button>
       </nav>
 
-      <div
-        className={`av-mobile-backdrop${open ? " open" : ""}`}
-        onClick={close}
-      />
+      <div className={`av-mobile-backdrop${open ? " open" : ""}`} onClick={close} />
       <aside className={`av-mobile-panel${open ? " open" : ""}`}>
         <div className="pixel neon-cyan" style={{ fontSize: 11, marginBottom: 16 }}>
           MENÚ
@@ -85,9 +92,17 @@ export function Nav() {
         <Link href="/about" className={isActive("acerca") ? "active" : ""} onClick={close}>
           Acerca de
         </Link>
-        <Link href="/auth" className={isActive("auth") ? "active" : ""} onClick={close}>
-          Iniciar Sesión
-        </Link>
+        {username ? (
+          <form action={signOut}>
+            <button type="submit" style={{ width: "100%" }}>
+              Salir ({username.toUpperCase()})
+            </button>
+          </form>
+        ) : (
+          <Link href="/auth" className={isActive("auth") ? "active" : ""} onClick={close}>
+            Iniciar Sesión
+          </Link>
+        )}
         <div style={{ flex: 1 }} />
         <div
           className="pixel"

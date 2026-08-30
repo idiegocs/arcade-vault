@@ -1,17 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GAMES, getSeededScores } from "@/lib/data";
+import { getBestScore } from "@/lib/scores";
 
-export default async function GameDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const game = GAMES.find((g) => g.id === id);
   if (!game) notFound();
 
   const scores = getSeededScores(id.length * 17 + 3, 10);
+  const best = await getBestScore(id);
 
   return (
     <div className="av-detail fade-in">
@@ -39,7 +37,7 @@ export default async function GameDetailPage({
                 className="v"
                 style={{ color: "var(--magenta)", textShadow: "0 0 6px rgba(255,0,110,0.5)" }}
               >
-                {game.best.toLocaleString("es-ES")}
+                {best == null ? "SIN RÉCORD" : best.toLocaleString("es-ES")}
               </div>
             </div>
             <div>
