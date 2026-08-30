@@ -189,6 +189,8 @@ a { color: inherit; text-decoration: none; }
 .av-nav .coin-counter { display: flex; align-items: center; gap: 8px; font-family: var(--pixel); font-size: 9px; color: var(--yellow); }
 .av-nav .coin-counter .coin { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff8b0, #f5ff00 60%, #b0b800); box-shadow: 0 0 8px var(--yellow); }
 .av-nav .auth-btn { margin-left: 16px; }
+.av-nav .nav-session { display: flex; align-items: center; gap: 10px; margin-left: 16px; }
+.av-nav .nav-session .nav-username { font-family: var(--pixel); font-size: 9px; color: var(--cyan); text-shadow: 0 0 8px rgba(0,245,255,0.5); }
 .av-nav .hamburger { display: none; }
 
 @media (max-width: 840px) {
@@ -211,12 +213,15 @@ a { color: inherit; text-decoration: none; }
   display: flex; flex-direction: column; gap: 8px;
 }
 .av-mobile-panel.open { transform: translateX(0); }
-.av-mobile-panel a {
+.av-mobile-panel a,
+.av-mobile-panel button {
   padding: 14px 12px;
   font-family: var(--pixel);
   font-size: 11px;
   color: var(--ink-dim);
   border-bottom: 1px dashed var(--line-2);
+  background: transparent;
+  text-align: left;
 }
 .av-mobile-panel a.active { color: var(--cyan); }
 .av-mobile-backdrop {
@@ -813,6 +818,7 @@ a { color: inherit; text-decoration: none; }
   content: ""; position: absolute; inset: 4px; pointer-events: none;
   border: 1px dashed rgba(0,245,255,0.18);
 }
+.auth-card.shake { animation: shake 0.4s; }
 .auth-header { text-align: center; margin-bottom: 18px; }
 .auth-header .mark {
   width: 56px; height: 56px;

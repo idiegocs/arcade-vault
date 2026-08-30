@@ -1,9 +1,19 @@
 import Link from "next/link";
-import { GAMES, getSeededScores } from "@/lib/data";
+import { GAMES } from "@/lib/data";
+import { getTopScoresByGame } from "@/lib/scores";
 
-export default function HallOfFamePage() {
-  const game = GAMES[0];
-  const rows = getSeededScores(game.id.length * 23 + 7, 12);
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("es-ES");
+}
+
+export default async function HallOfFamePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ game?: string }>;
+}) {
+  const { game: gameParam } = await searchParams;
+  const game = GAMES.find((g) => g.id === gameParam) ?? GAMES[0];
+  const rows = await getTopScoresByGame(game.id, 12);
 
   return (
     <div className="av-hall fade-in">
@@ -16,60 +26,82 @@ export default function HallOfFamePage() {
 
       <div className="hall-tabs">
         {GAMES.map((g) => (
-          <button key={g.id} type="button" className={`chip${g.id === game.id ? " active" : ""}`}>
-            {g.title}
-          </button>
-        ))}
-      </div>
-
-      <div className="podium">
-        <div className="podium-slot silver">
-          <div className="rank-num">02</div>
-          <div className="name">{rows[1].name}</div>
-          <div className="score">{rows[1].score.toLocaleString("es-ES")}</div>
-          <div className="date">{rows[1].date}</div>
-        </div>
-        <div className="podium-slot gold">
-          <div className="pixel" style={{ fontSize: 9, color: "var(--gold)", letterSpacing: "0.18em" }}>
-            CAMPEÓN
-          </div>
-          <div className="rank-num" style={{ fontSize: 36, marginTop: 4 }}>
-            01
-          </div>
-          <div className="name">{rows[0].name}</div>
-          <div className="score" style={{ fontSize: 20 }}>
-            {rows[0].score.toLocaleString("es-ES")}
-          </div>
-          <div className="date">{rows[0].date}</div>
-        </div>
-        <div className="podium-slot bronze">
-          <div className="rank-num">03</div>
-          <div className="name">{rows[2].name}</div>
-          <div className="score">{rows[2].score.toLocaleString("es-ES")}</div>
-          <div className="date">{rows[2].date}</div>
-        </div>
-      </div>
-
-      <div className="hall-table">
-        <div className="th">
-          <div>RANGO</div>
-          <div>JUGADOR</div>
-          <div>PUNTUACIÓN</div>
-          <div>FECHA</div>
-        </div>
-        {rows.map((r, i) => (
-          <div
-            key={r.name + i}
-            className={`tr${i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : ""}`}
-            style={{ animationDelay: `${i * 50}ms` }}
+          <Link
+            key={g.id}
+            href={`/salon-de-la-fama?game=${g.id}`}
+            className={`chip${g.id === game.id ? " active" : ""}`}
           >
-            <div className="rk">#{String(r.rank).padStart(2, "0")}</div>
-            <div className="pl">{r.name}</div>
-            <div className="sc">{r.score.toLocaleString("es-ES")}</div>
-            <div className="dt">{r.date}</div>
-          </div>
+            {g.title}
+          </Link>
         ))}
       </div>
+
+      {rows.length === 0 ? (
+        <div className="hall-empty" style={{ textAlign: "center", padding: "48px 16px" }}>
+          <p className="pixel neon-cyan" style={{ fontSize: 12, letterSpacing: "0.14em" }}>
+            SIN PUNTAJES AÚN
+          </p>
+          <p className="mono" style={{ color: "var(--ink-faint)", marginTop: 10, fontSize: 13 }}>
+            Todavía nadie registró un puntaje en {game.title}. Sé el primero en aparecer aquí.
+          </p>
+        </div>
+      ) : (
+        <>
+          {rows.length >= 3 && (
+            <div className="podium">
+              <div className="podium-slot silver">
+                <div className="rank-num">02</div>
+                <div className="name">{rows[1].username}</div>
+                <div className="score">{rows[1].score.toLocaleString("es-ES")}</div>
+                <div className="date">{formatDate(rows[1].created_at)}</div>
+              </div>
+              <div className="podium-slot gold">
+                <div
+                  className="pixel"
+                  style={{ fontSize: 9, color: "var(--gold)", letterSpacing: "0.18em" }}
+                >
+                  CAMPEÓN
+                </div>
+                <div className="rank-num" style={{ fontSize: 36, marginTop: 4 }}>
+                  01
+                </div>
+                <div className="name">{rows[0].username}</div>
+                <div className="score" style={{ fontSize: 20 }}>
+                  {rows[0].score.toLocaleString("es-ES")}
+                </div>
+                <div className="date">{formatDate(rows[0].created_at)}</div>
+              </div>
+              <div className="podium-slot bronze">
+                <div className="rank-num">03</div>
+                <div className="name">{rows[2].username}</div>
+                <div className="score">{rows[2].score.toLocaleString("es-ES")}</div>
+                <div className="date">{formatDate(rows[2].created_at)}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="hall-table">
+            <div className="th">
+              <div>RANGO</div>
+              <div>JUGADOR</div>
+              <div>PUNTUACIÓN</div>
+              <div>FECHA</div>
+            </div>
+            {rows.map((r, i) => (
+              <div
+                key={r.username + i}
+                className={`tr${i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : ""}`}
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
+                <div className="pl">{r.username}</div>
+                <div className="sc">{r.score.toLocaleString("es-ES")}</div>
+                <div className="dt">{formatDate(r.created_at)}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <div style={{ textAlign: "center", marginTop: 32 }}>
         <Link href="/games" className="btn lg">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Press_Start_2P, Courier_Prime, JetBrains_Mono } from "next/font/google";
 import { Nav, Footer } from "@/components/nav";
+import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
 const pressStart2P = Press_Start_2P({
@@ -26,15 +27,33 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Arcade Vault · Portal Retro",
-  description:
-    "Plataforma para jugar online y competir por la mayor cantidad de puntos.",
+  description: "Plataforma para jugar online y competir por la mayor cantidad de puntos.",
 };
 
-export default function RootLayout({
+async function getSessionUsername() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("username")
+    .eq("id", user.id)
+    .single();
+
+  return profile?.username ?? null;
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const username = await getSessionUsername();
+
   return (
     <html
       lang="es"
@@ -44,7 +63,7 @@ export default function RootLayout({
         <div className="av-bg" />
         <div className="av-noise" />
         <div id="root">
-          <Nav />
+          <Nav username={username} />
           <main className="av-main">{children}</main>
           <Footer />
         </div>

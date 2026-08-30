@@ -1,7 +1,10 @@
 import { GameCard } from "@/components/game-card";
 import { CATEGORIES, GAMES } from "@/lib/data";
+import { getBestScoresByGames } from "@/lib/scores";
 
-export default function Home() {
+export default async function Home() {
+  const bestScores = await getBestScoresByGames(GAMES.map((g) => g.id));
+
   return (
     <div className="fade-in">
       <section className="av-hero">
@@ -27,7 +30,7 @@ export default function Home() {
 
       <div className="av-grid">
         {GAMES.map((game) => (
-          <GameCard key={game.id} game={game} />
+          <GameCard key={game.id} game={game} best={bestScores[game.id]} />
         ))}
       </div>
     </div>
