@@ -1,15 +1,36 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GAMES } from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
+import { GAME_ENGINES } from "@/components/games/registry";
+import { GamePlayerShell } from "@/components/games/game-player-shell";
 
-export default async function GamePlayerPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+async function getSessionUsername() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("username")
+    .eq("id", user.id)
+    .single();
+
+  return profile?.username ?? null;
+}
+
+export default async function GamePlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const game = GAMES.find((g) => g.id === id);
   if (!game) notFound();
+
+  if (GAME_ENGINES[id]) {
+    const username = await getSessionUsername();
+    return <GamePlayerShell gameId={game.id} gameTitle={game.title} username={username} />;
+  }
 
   return (
     <div className="av-player fade-in">
