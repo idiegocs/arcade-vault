@@ -106,7 +106,6 @@ export function getGameById(id: string): Promise<Game | null>;
 ```ts
 // lib/scores.ts (agregado)
 export function getPlaysCount(gameId: string): Promise<number>;
-export function getPlaysCountByGames(gameIds: string[]): Promise<Record<string, number>>;
 
 export type GlobalRankRow = { username: string; totalScore: number; gamesPlayed: number };
 export function getGlobalTopPlayers(limit?: number): Promise<GlobalRankRow[]>;
@@ -136,7 +135,7 @@ Convención: `games.id` es el mismo slug ya usado en rutas (`/juegos/rocas`) y e
 - [x] `scores.game_id` tiene una foreign key real hacia `games.id`; `get_advisors` no reporta hallazgos de seguridad nuevos.
 - [x] `lib/data.ts` ya no existe en el repo.
 - [x] `lib/games.ts` exporta `Game`, `GameCategory`, `CATEGORIES`, `getGames()`, `getGameById(id)`.
-- [x] `lib/scores.ts` exporta además `getPlaysCount`, `getPlaysCountByGames`, `getGlobalTopPlayers`.
+- [x] `lib/scores.ts` exporta además `getPlaysCount`, `getGlobalTopPlayers`.
 - [x] `/games` muestra las 8 cards en el mismo orden que antes, con el mismo mejor puntaje real que ya mostraba.
 - [x] `/juegos/[id]` para cada uno de los 8 juegos muestra "Partidas" como un número real (conteo de `scores`, no el string "12.4K" hardcodeado anterior).
 - [x] `/juegos/[id]` para "rocas" muestra en el panel "MEJORES PUNTUACIONES" las filas reales de `scores` (no nombres aleatorios de `getSeededScores`); para los otros 7 juegos sin puntajes, el panel se muestra vacío en vez de datos falsos.
@@ -171,6 +170,7 @@ Convención: `games.id` es el mismo slug ya usado en rutas (`/juegos/rocas`) y e
 - **Sí:** este spec sube la versión de `0.1.0` a `0.2.0` (minor) — agrega funcionalidad nueva de cara al usuario (ranking global, catálogo real) sin romper nada existente.
 - **Sí:** se acepta que el número visible en el Footer "baje" de v2.6.0 a v0.2.0 — el v2.6.0 nunca representó nada real, así que no es un retroceso funcional, solo deja de mostrar un dato inventado.
 - **Sí:** el encabezado de este spec (y de los futuros, por convención de repo desde ahora) agrega un campo "Versión" declarando a qué versión de `package.json` queda el proyecto al implementarlo — da trazabilidad spec ↔ versión desplegada sin necesitar un archivo aparte.
+- **Sí (pasada de limpieza post-implementación con `/code-review`):** tras marcar el spec como Implementado, se corrió `/code-review` sobre el diff completo (specs 05+06) y se aplicaron 8 correcciones: `getGames()`/`getGameById()` ahora lanzan en vez de devolver `[]`/`null` ante un error real de Supabase (distingue "falló" de "no existe/vacío"); `/salon-de-la-fama` restaura el fallback al primer juego para un `?game=` inválido (antes caía silenciosamente en GLOBAL); `saveScore` (Server Action) ya no expone el mensaje crudo de Postgres al usuario; se eliminó la duplicación de `getSessionUsername()` (ahora vive en `lib/session.ts`, compartido por `app/layout.tsx` y `app/juegos/[id]/jugar/page.tsx`) y de la resolución de `username` en `lib/scores.ts` (helper `resolveUsernames` compartido); se quitó `getPlaysCountByGames` (código muerto, nunca se conectó a ninguna UI); y se actualizó `components/games/README.md` para ya no mencionar `lib/data.ts`.
 - **Sí:** el nombre del archivo del spec y el de la rama de git también incluyen la versión destino (`specs/06-...-v0.2.0.md`, `feature/spec-06-...-v0.2.0`) — decisión explícita del usuario, extiende la misma trazabilidad al archivo y a la rama, no solo al encabezado.
 - **Sí (verificación final, paso 12):** se verificó jugando una partida real de principio a fin con Playwright (cuenta nueva `spec06test`, botón FIN, score real de 20 por un asteroide grande) en vez de solo revisar código — confirmó en vivo que `saveScore` (spec 05) dispara y que `/juegos/rocas`, `/games` y ambas tabs de `/salon-de-la-fama` (ROCAS y GLOBAL) reflejan el dato nuevo sin intervención manual en la base. La cuenta y el score de prueba se dejaron en la base real a pedido explícito del usuario (no se limpiaron).
 - **Sí (agregado después de marcar el spec como Implementado, a pedido explícito del usuario):** se crea `CHANGELOG.md` (formato Keep a Changelog) con una entrada `[0.2.0]` para este spec y una entrada `[0.1.0]` retroactiva resumiendo los specs 01-05, derivada del historial de `git log` (esos specs nunca bumpearon versión, todos quedaron bajo "0.1.0"). Se arreglaron también los skills `/spec` (el paso del plan que bumpea versión ahora siempre incluye la entrada del CHANGELOG) y `/spec-impl` (red de seguridad: si el paso no la menciona explícitamente, se agrega igual) para que esto sea automático en specs futuros.

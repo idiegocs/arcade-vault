@@ -2,7 +2,8 @@
 
 1. Crea `components/games/<id>/` con un motor que exporte una función que
    cumpla `EngineFactory` (de `../game-engine`). El `<id>` es el mismo `id`
-   ya definido en `GAMES` (`lib/data.ts`) — no se inventa uno nuevo.
+   ya definido en la tabla `games` de Supabase (`lib/games.ts`, `getGames()`)
+   — no se inventa uno nuevo.
 2. El motor dibuja sobre `ARENA_WIDTH × ARENA_HEIGHT`, llama a `onState(...)`
    solo cuando el valor mostrado realmente cambia (`score`, `lives`, `level`,
    `phase` o `badge` — no en cada frame de `requestAnimationFrame`), y su

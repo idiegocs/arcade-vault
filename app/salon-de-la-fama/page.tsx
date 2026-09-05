@@ -15,8 +15,12 @@ export default async function HallOfFamePage({
 }) {
   const { game: gameParam } = await searchParams;
   const games = await getGames();
-  const selectedGame = games.find((g) => g.id === gameParam);
-  const isGlobal = !selectedGame;
+  // Sin ?game=, la tab por defecto es GLOBAL. Con un ?game= que no calza con
+  // ningún juego real (link viejo, typo), se cae al primer juego en vez de
+  // GLOBAL — igual que el comportamiento pre-spec06 (`GAMES.find(...) ?? GAMES[0]`).
+  const selectedGame =
+    gameParam === undefined ? undefined : (games.find((g) => g.id === gameParam) ?? games[0]);
+  const isGlobal = selectedGame === undefined;
 
   const extraLabel = isGlobal ? "PARTIDAS" : "FECHA";
   const emptyMessage = isGlobal

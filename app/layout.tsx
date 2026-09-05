@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Press_Start_2P, Courier_Prime, JetBrains_Mono } from "next/font/google";
 import { Nav, Footer } from "@/components/nav";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUsername } from "@/lib/session";
 import "./globals.css";
 
 const pressStart2P = Press_Start_2P({
@@ -29,23 +29,6 @@ export const metadata: Metadata = {
   title: "Arcade Vault · Portal Retro",
   description: "Plataforma para jugar online y competir por la mayor cantidad de puntos.",
 };
-
-async function getSessionUsername() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username")
-    .eq("id", user.id)
-    .single();
-
-  return profile?.username ?? null;
-}
 
 export default async function RootLayout({
   children,

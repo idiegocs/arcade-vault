@@ -33,7 +33,10 @@ export async function saveScore(gameId: string, score: number): Promise<SaveScor
   });
 
   if (error) {
-    return { ok: false, error: error.message };
+    // No exponer el mensaje crudo de Postgres al usuario (puede filtrar
+    // nombres de constraints, ej. la FK de scores.game_id -> games.id).
+    console.error("saveScore insert failed:", error);
+    return { ok: false, error: "No se pudo guardar tu puntuación. Intenta de nuevo." };
   }
 
   // El "Mejor global" (/juegos/[id] y /games) y el leaderboard

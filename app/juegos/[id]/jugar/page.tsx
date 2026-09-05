@@ -1,26 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getGameById } from "@/lib/games";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionUsername } from "@/lib/session";
 import { GAME_ENGINES } from "@/components/games/registry";
 import { GamePlayerShell } from "@/components/games/game-player-shell";
-
-async function getSessionUsername() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username")
-    .eq("id", user.id)
-    .single();
-
-  return profile?.username ?? null;
-}
 
 export default async function GamePlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
