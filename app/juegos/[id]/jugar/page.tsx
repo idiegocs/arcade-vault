@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { GAMES } from "@/lib/data";
+import { getGameById } from "@/lib/games";
+import { getSessionUsername } from "@/lib/session";
+import { GAME_ENGINES } from "@/components/games/registry";
+import { GamePlayerShell } from "@/components/games/game-player-shell";
 
-export default async function GamePlayerPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function GamePlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const game = GAMES.find((g) => g.id === id);
+  const game = await getGameById(id);
   if (!game) notFound();
+
+  if (GAME_ENGINES[id]) {
+    const username = await getSessionUsername();
+    return <GamePlayerShell gameId={game.id} gameTitle={game.title} username={username} />;
+  }
 
   return (
     <div className="av-player fade-in">

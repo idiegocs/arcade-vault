@@ -1,15 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { GAMES, getSeededScores } from "@/lib/data";
-import { getBestScore } from "@/lib/scores";
+import { getGameById } from "@/lib/games";
+import { getBestScore, getPlaysCount, getTopScoresByGame } from "@/lib/scores";
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("es-ES");
+}
 
 export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const game = GAMES.find((g) => g.id === id);
+  const game = await getGameById(id);
   if (!game) notFound();
 
-  const scores = getSeededScores(id.length * 17 + 3, 10);
-  const best = await getBestScore(id);
+  const [scores, best, plays] = await Promise.all([
+    getTopScoresByGame(id, 10),
+    getBestScore(id),
+    getPlaysCount(id),
+  ]);
 
   return (
     <div className="av-detail fade-in">
@@ -29,7 +36,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
           <div className="stat-strip">
             <div>
               <div className="l">Partidas</div>
-              <div className="v">{game.plays}</div>
+              <div className="v">{plays.toLocaleString("es-ES")}</div>
             </div>
             <div>
               <div className="l">Mejor global</div>
@@ -64,21 +71,30 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
       <aside>
         <div className="leaderboard">
           <h3>MEJORES PUNTUACIONES</h3>
-          {scores.map((r, i) => (
-            <div
-              key={r.name}
-              className={`lb-row${i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : ""}`}
+          {scores.length === 0 ? (
+            <p
+              className="mono"
+              style={{ color: "var(--ink-faint)", fontSize: 13, padding: "8px 0" }}
             >
-              <div className="rk">#{String(r.rank).padStart(2, "0")}</div>
-              <div className="pl">
-                {r.name}
-                <div style={{ fontSize: 10, color: "var(--ink-faint)", letterSpacing: "0.1em" }}>
-                  {r.date}
+              Todavía nadie registró un puntaje en {game.title}.
+            </p>
+          ) : (
+            scores.map((r, i) => (
+              <div
+                key={r.username + i}
+                className={`lb-row${i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : ""}`}
+              >
+                <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
+                <div className="pl">
+                  {r.username}
+                  <div style={{ fontSize: 10, color: "var(--ink-faint)", letterSpacing: "0.1em" }}>
+                    {formatDate(r.created_at)}
+                  </div>
                 </div>
+                <div className="sc">{r.score.toLocaleString("es-ES")}</div>
               </div>
-              <div className="sc">{r.score.toLocaleString("es-ES")}</div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </aside>
     </div>

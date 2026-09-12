@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Game } from "@/lib/data";
+import type { Game } from "@/lib/games";
 
 export function GameCard({ game, best }: { game: Game; best?: number | null }) {
   return (

@@ -50,10 +50,27 @@ export async function getBestScoresByGames(
 }
 
 /**
+ * Resuelve el username de cada `user_id` vía `profiles` (no hay FK directa
+ * entre `scores`/`profiles`, ambas referencian a `auth.users`). Devuelve
+ * "???" para cualquier id sin perfil encontrado. Compartido por cualquier
+ * consulta que necesite mostrar nombres de jugador a partir de `scores`.
+ */
+async function resolveUsernames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userIds: string[]
+): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, username")
+    .in("id", userIds);
+
+  return new Map((profiles ?? []).map((p) => [p.id, p.username]));
+}
+
+/**
  * Top de puntajes de un juego, con el username de cada jugador.
- * `scores` solo guarda `user_id`; el username se resuelve con una segunda
- * consulta a `profiles` (no hay FK directa entre ambas tablas, ambas
- * referencian a `auth.users`).
  */
 export async function getTopScoresByGame(gameId: string, limit = 10): Promise<TopScoreRow[]> {
   const supabase = await createClient();
@@ -67,17 +84,60 @@ export async function getTopScoresByGame(gameId: string, limit = 10): Promise<To
 
   if (error || !scores || scores.length === 0) return [];
 
-  const userIds = [...new Set(scores.map((s) => s.user_id))];
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, username")
-    .in("id", userIds);
-
-  const usernameById = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+  const usernameById = await resolveUsernames(supabase, [...new Set(scores.map((s) => s.user_id))]);
 
   return scores.map((s) => ({
     username: usernameById.get(s.user_id) ?? "???",
     score: s.score,
     created_at: s.created_at,
   }));
+}
+
+/** Cantidad de partidas guardadas (filas de `scores`) para un juego. */
+export async function getPlaysCount(gameId: string): Promise<number> {
+  const supabase = await createClient();
+
+  const { count, error } = await supabase
+    .from("scores")
+    .select("*", { count: "exact", head: true })
+    .eq("game_id", gameId);
+
+  if (error || count == null) return 0;
+
+  return count;
+}
+
+export type GlobalRankRow = { username: string; totalScore: number; gamesPlayed: number };
+
+/**
+ * Ranking global: suma de TODOS los puntajes históricos de cada jugador,
+ * en cualquier juego (no el mejor por juego) — premia jugar mucho, no solo
+ * jugar bien. `gamesPlayed` es el conteo total de partidas guardadas de ese
+ * jugador, en cualquier juego.
+ */
+export async function getGlobalTopPlayers(limit = 12): Promise<GlobalRankRow[]> {
+  const supabase = await createClient();
+
+  const { data: scores, error } = await supabase.from("scores").select("user_id, score");
+
+  if (error || !scores || scores.length === 0) return [];
+
+  const totals = new Map<string, { totalScore: number; gamesPlayed: number }>();
+  for (const s of scores) {
+    const entry = totals.get(s.user_id) ?? { totalScore: 0, gamesPlayed: 0 };
+    entry.totalScore += s.score;
+    entry.gamesPlayed += 1;
+    totals.set(s.user_id, entry);
+  }
+
+  const usernameById = await resolveUsernames(supabase, [...totals.keys()]);
+
+  return [...totals.entries()]
+    .map(([userId, { totalScore, gamesPlayed }]) => ({
+      username: usernameById.get(userId) ?? "???",
+      totalScore,
+      gamesPlayed,
+    }))
+    .sort((a, b) => b.totalScore - a.totalScore)
+    .slice(0, limit);
 }

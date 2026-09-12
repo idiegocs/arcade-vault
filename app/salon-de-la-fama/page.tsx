@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { GAMES } from "@/lib/data";
-import { getTopScoresByGame } from "@/lib/scores";
+import { getGames } from "@/lib/games";
+import { getGlobalTopPlayers, getTopScoresByGame } from "@/lib/scores";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-ES");
 }
+
+type DisplayRow = { username: string; score: number; extra: string };
 
 export default async function HallOfFamePage({
   searchParams,
@@ -12,8 +14,30 @@ export default async function HallOfFamePage({
   searchParams: Promise<{ game?: string }>;
 }) {
   const { game: gameParam } = await searchParams;
-  const game = GAMES.find((g) => g.id === gameParam) ?? GAMES[0];
-  const rows = await getTopScoresByGame(game.id, 12);
+  const games = await getGames();
+  // Sin ?game=, la tab por defecto es GLOBAL. Con un ?game= que no calza con
+  // ningún juego real (link viejo, typo), se cae al primer juego en vez de
+  // GLOBAL — igual que el comportamiento pre-spec06 (`GAMES.find(...) ?? GAMES[0]`).
+  const selectedGame =
+    gameParam === undefined ? undefined : (games.find((g) => g.id === gameParam) ?? games[0]);
+  const isGlobal = selectedGame === undefined;
+
+  const extraLabel = isGlobal ? "PARTIDAS" : "FECHA";
+  const emptyMessage = isGlobal
+    ? "Todavía nadie tiene puntajes registrados. Sé el primero en aparecer aquí."
+    : `Todavía nadie registró un puntaje en ${selectedGame!.title}. Sé el primero en aparecer aquí.`;
+
+  const rows: DisplayRow[] = isGlobal
+    ? (await getGlobalTopPlayers(12)).map((r) => ({
+        username: r.username,
+        score: r.totalScore,
+        extra: String(r.gamesPlayed),
+      }))
+    : (await getTopScoresByGame(selectedGame!.id, 12)).map((r) => ({
+        username: r.username,
+        score: r.score,
+        extra: formatDate(r.created_at),
+      }));
 
   return (
     <div className="av-hall fade-in">
@@ -25,11 +49,14 @@ export default async function HallOfFamePage({
       </div>
 
       <div className="hall-tabs">
-        {GAMES.map((g) => (
+        <Link href="/salon-de-la-fama" className={`chip${isGlobal ? " active" : ""}`}>
+          GLOBAL
+        </Link>
+        {games.map((g) => (
           <Link
             key={g.id}
             href={`/salon-de-la-fama?game=${g.id}`}
-            className={`chip${g.id === game.id ? " active" : ""}`}
+            className={`chip${g.id === selectedGame?.id ? " active" : ""}`}
           >
             {g.title}
           </Link>
@@ -42,7 +69,7 @@ export default async function HallOfFamePage({
             SIN PUNTAJES AÚN
           </p>
           <p className="mono" style={{ color: "var(--ink-faint)", marginTop: 10, fontSize: 13 }}>
-            Todavía nadie registró un puntaje en {game.title}. Sé el primero en aparecer aquí.
+            {emptyMessage}
           </p>
         </div>
       ) : (
@@ -53,7 +80,7 @@ export default async function HallOfFamePage({
                 <div className="rank-num">02</div>
                 <div className="name">{rows[1].username}</div>
                 <div className="score">{rows[1].score.toLocaleString("es-ES")}</div>
-                <div className="date">{formatDate(rows[1].created_at)}</div>
+                <div className="date">{rows[1].extra}</div>
               </div>
               <div className="podium-slot gold">
                 <div
@@ -69,13 +96,13 @@ export default async function HallOfFamePage({
                 <div className="score" style={{ fontSize: 20 }}>
                   {rows[0].score.toLocaleString("es-ES")}
                 </div>
-                <div className="date">{formatDate(rows[0].created_at)}</div>
+                <div className="date">{rows[0].extra}</div>
               </div>
               <div className="podium-slot bronze">
                 <div className="rank-num">03</div>
                 <div className="name">{rows[2].username}</div>
                 <div className="score">{rows[2].score.toLocaleString("es-ES")}</div>
-                <div className="date">{formatDate(rows[2].created_at)}</div>
+                <div className="date">{rows[2].extra}</div>
               </div>
             </div>
           )}
@@ -85,7 +112,7 @@ export default async function HallOfFamePage({
               <div>RANGO</div>
               <div>JUGADOR</div>
               <div>PUNTUACIÓN</div>
-              <div>FECHA</div>
+              <div>{extraLabel}</div>
             </div>
             {rows.map((r, i) => (
               <div
@@ -96,7 +123,7 @@ export default async function HallOfFamePage({
                 <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
                 <div className="pl">{r.username}</div>
                 <div className="sc">{r.score.toLocaleString("es-ES")}</div>
-                <div className="dt">{formatDate(r.created_at)}</div>
+                <div className="dt">{r.extra}</div>
               </div>
             ))}
           </div>

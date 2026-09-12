@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { signOut } from "@/app/actions/auth";
+import { version } from "@/package.json";
 
 type NavTarget = "inicio" | "biblioteca" | "salon" | "acerca" | "auth";
 
@@ -128,7 +129,7 @@ export function Footer() {
         letterSpacing: "0.16em",
       }}
     >
-      © 2026 ARCADE VAULT · HECHO CON PIXELES Y NEÓN · v2.6.0
+      © 2026 ARCADE VAULT · HECHO CON PIXELES Y NEÓN · v{version}
     </footer>
   );
 }
