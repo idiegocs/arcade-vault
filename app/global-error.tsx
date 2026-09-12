@@ -90,6 +90,9 @@ export default function GlobalError({
             >
               REINTENTAR
             </button>
+            {/* <a> a propósito, no next/link: el root layout (con el router
+                montado normalmente) es justo lo que acaba de fallar acá. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
               style={{

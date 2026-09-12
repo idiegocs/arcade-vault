@@ -6,6 +6,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.2.1] - 2026-09-12
+
+Spec: [`07-caida-tetris-motor-v0.2.1`](specs/07-caida-tetris-motor-v0.2.1.md)
+
+### Added
+
+- Motor real del juego CAÍDA (Tetris), portado de `references/started-games/03-tetris`: las 8 piezas del original (7 tetrominós + la "tuerca"), caída suave/dura, rotación con wall-kick, pieza fantasma y vista previa de "próxima pieza" dibujada dentro del mismo canvas.
+- Sistema de 3 vidas propio de este port: un topout limpia el tablero y resta una vida en vez de terminar la partida; `score`/`level`/líneas acumuladas no se resetean entre vidas.
+
 ## [0.2.0] - 2026-09-05
 
 Spec: [`06-ranking-global-catalogo-juegos-v0.2.0`](specs/06-ranking-global-catalogo-juegos-v0.2.0.md)

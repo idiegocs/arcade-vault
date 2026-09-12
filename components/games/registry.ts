@@ -7,4 +7,5 @@ import type { EngineLoader } from "./game-engine";
  */
 export const GAME_ENGINES: Record<string, EngineLoader> = {
   rocas: () => import("./rocas/asteroids-engine").then((m) => m.createAsteroidsEngine),
+  caida: () => import("./caida/tetris-engine").then((m) => m.createTetrisEngine),
 };
