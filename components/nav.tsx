@@ -2,15 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { signOut } from "@/app/actions/auth";
 import { version } from "@/package.json";
+import { isMuted, toggleMuted } from "./games/audio";
 
 type NavTarget = "inicio" | "biblioteca" | "salon" | "acerca" | "auth";
 
 export function Nav({ username }: { username: string | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Arranca en `false` para calzar con el render del servidor (no hay
+  // `localStorage` ahí) y se sincroniza con el valor real ya en el cliente.
+  const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    // Sincroniza con `localStorage` recién en el cliente, después de
+    // hidratar — leerlo antes (en el render inicial o en el initializer de
+    // useState) rompería la hidratación, porque el servidor no tiene acceso
+    // a `localStorage` y siempre "ve" `false`.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMuted(isMuted());
+  }, []);
+
+  const handleToggleMute = () => setMuted(toggleMuted());
 
   const isActive = (target: NavTarget) => {
     if (target === "inicio") return pathname === "/";
@@ -50,6 +65,15 @@ export function Nav({ username }: { username: string | null }) {
           <span className="coin" />
           <span>CRÉDITOS · 03</span>
         </div>
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={handleToggleMute}
+          aria-label={muted ? "Activar sonido" : "Silenciar sonido"}
+          title={muted ? "Activar sonido" : "Silenciar sonido"}
+        >
+          {muted ? "♪ OFF" : "♪ ON"}
+        </button>
         {username ? (
           <form action={signOut} className="nav-session">
             <span className="nav-username mono">{username.toUpperCase()}</span>
@@ -104,6 +128,15 @@ export function Nav({ username }: { username: string | null }) {
             Iniciar Sesión
           </Link>
         )}
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={handleToggleMute}
+          aria-label={muted ? "Activar sonido" : "Silenciar sonido"}
+          style={{ width: "100%" }}
+        >
+          {muted ? "♪ SONIDO OFF" : "♪ SONIDO ON"}
+        </button>
         <div style={{ flex: 1 }} />
         <div
           className="pixel"

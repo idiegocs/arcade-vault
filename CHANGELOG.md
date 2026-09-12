@@ -6,6 +6,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.2.2] - 2026-09-12
+
+Spec: [`08-libreria-sonido-motores-v0.2.2`](specs/08-libreria-sonido-motores-v0.2.2.md)
+
+### Added
+
+- `components/games/audio.ts`: librería de sonido transversal — efectos sintetizados con Web Audio API (osciladores, sin archivos de audio), y un control de mute persistido en `localStorage`.
+- Ícono de mute/unmute global en la Nav (escritorio y panel móvil).
+- Sonidos en ROCAS: disparo, impacto de bala en asteroide, explosión de la nave, recoger power-up.
+- Sonidos en CAÍDA: rotar pieza, caída (suave/dura), línea completada, topout.
+
 ## [0.2.1] - 2026-09-12
 
 Spec: [`07-caida-tetris-motor-v0.2.1`](specs/07-caida-tetris-motor-v0.2.1.md)

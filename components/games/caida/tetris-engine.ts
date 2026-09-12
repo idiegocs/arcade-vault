@@ -24,6 +24,7 @@ import {
   type EnginePhase,
   type EngineState,
 } from "../game-engine";
+import { playSound } from "../audio";
 
 const COLS = 10;
 const ROWS = 20;
@@ -191,6 +192,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
       if (!collide(rotated, current.x + kick, current.y)) {
         current.shape = rotated;
         current.x += kick;
+        playSound("rotate");
         return;
       }
     }
@@ -210,6 +212,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
    * frescas (nunca pueden colisionar en un tablero vacío) sin tocar
    * `score`/`level`/`lines`. En la última vida, `"gameover"` real. */
   function handleTopout() {
+    playSound("topout");
     lives--;
     if (lives <= 0) {
       internalPhase = "gameover";
@@ -241,6 +244,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
       }
     }
     if (cleared === 0) return;
+    playSound("lineClear");
     lines += cleared;
     score += (LINE_SCORES[cleared] ?? 0) * level;
     level = Math.floor(lines / 10) + 1;
@@ -249,6 +253,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
   }
 
   function lockPiece() {
+    playSound("drop");
     merge();
     clearLines();
     spawn();

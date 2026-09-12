@@ -17,6 +17,7 @@ import {
   type EnginePhase,
   type EngineState,
 } from "../game-engine";
+import { playSound } from "../audio";
 
 type Point = { x: number; y: number };
 
@@ -404,6 +405,7 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState) => {
   }
 
   function killShip() {
+    playSound("explosion");
     explode(ship.x, ship.y, 14);
     ship.dead = true;
     lives--;
@@ -464,7 +466,9 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState) => {
     }
 
     if (pressed("Space")) {
-      bullets.push(...ship.tryShoot());
+      const newBullets = ship.tryShoot();
+      if (newBullets.length > 0) playSound("shoot");
+      bullets.push(...newBullets);
     }
 
     ship.update(dt);
@@ -481,6 +485,7 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState) => {
       if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
         p.dead = true;
         ship.tripleShot = POWERUP_DURATION;
+        playSound("powerup");
       }
     }
 
@@ -490,6 +495,7 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState) => {
         if (!a.dead && !b.dead && dist(b, a) < a.radius) {
           b.dead = true;
           a.dead = true;
+          playSound("impact");
           score += POINTS[a.size];
           explode(a.x, a.y, a.size * 5);
           newAsteroids.push(...a.split());
