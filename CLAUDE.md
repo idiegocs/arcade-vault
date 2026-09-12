@@ -6,11 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Arcade Vault — a platform for playing games online and competing on points/leaderboards (per README, in Spanish). Currently just the unmodified `create-next-app` scaffold: no game features, routes, or components beyond the default `app/page.tsx` exist yet.
+Arcade Vault — a platform for playing games online and competing on points/leaderboards (per README, in Spanish). Built out via specs 01–06: real Supabase-backed auth, scores, and game catalog, plus one real playable game engine (`rocas`/Asteroids, spec 05) behind a pluggable engine contract (`components/games/game-engine.ts`) that the rest of the catalog can plug into. See `components/games/README.md` for how a new game is wired in.
 
 ## Skills
 
-Usa siempre el /fontend-design para hacer interfaz de usuario
+Usa siempre el /fontend-design para hacer interfaz de usuario.
+
+This repo also ships two project-scoped skills under `.claude/skills/`: `add-game` (designs a spec for a new/ported game — motor, registry, Supabase row if needed, cover CSS if needed) and `add-game-impl` (implements an approved one). Use them instead of ad-hoc game additions.
 
 ## Stack
 
@@ -25,4 +27,4 @@ Next.js 16.2.10 postdates this model's training data and has breaking changes vs
 
 ## Spec-driven workflow
 
-The README documents an intended spec-driven design workflow using `/spec` and `/spec-impl`, based on the `Klerith/fernando-skills` skill pack (`npx skills@latest add Klerith/fernando-skills`). These skills are not currently installed in this repo (no `.claude/` skills directory present).
+The README documents an intended spec-driven design workflow using `/spec` and `/spec-impl`, based on the `Klerith/fernando-skills` skill pack (`npx skills@latest add Klerith/fernando-skills`). Those two are user-level skills (`~/.claude/skills/`), not installed in this repo's own `.claude/` — only the game-specific `add-game`/`add-game-impl` pair above is project-scoped and committed.

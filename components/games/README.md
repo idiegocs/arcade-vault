@@ -1,9 +1,23 @@
 # Cómo agregar un juego nuevo
 
+**Usa `/add-game` (diseña el spec) + `/add-game-impl` (lo implementa)** —
+esos dos skills (`.claude/skills/add-game/`, `.claude/skills/add-game-impl/`)
+conocen los 4 artefactos de abajo, los gotchas del contrato de motor y el
+orden en que hay que aplicarlos. Lo que sigue es la receta manual que
+automatizan, para cuando necesites entender o revisar lo que hicieron.
+
 1. Crea `components/games/<id>/` con un motor que exporte una función que
    cumpla `EngineFactory` (de `../game-engine`). El `<id>` es el mismo `id`
    ya definido en la tabla `games` de Supabase (`lib/games.ts`, `getGames()`)
-   — no se inventa uno nuevo.
+   — no se inventa uno nuevo. **Si el juego todavía no tiene fila en
+   `games`**, hay que crearla antes de poder guardar cualquier puntaje
+   (`scores.game_id` tiene una FK a `games(id)`): una migración versionada en
+   `sql/00N_add_game_<id>.sql` aplicada con el MCP de Supabase
+   (`apply_migration`), igual que hicieron las specs 04/05/06. Esa fila
+   también necesita una portada: `cover` es el nombre de una clase CSS
+   (`.cover-<slug>`, no una imagen) que se agrega a la sección "Cover art
+   generators" de `app/globals.css`, siguiendo el mismo patrón de gradientes
+   que las 8 portadas existentes.
 2. El motor dibuja sobre `ARENA_WIDTH × ARENA_HEIGHT`, llama a `onState(...)`
    solo cuando el valor mostrado realmente cambia (`score`, `lives`, `level`,
    `phase` o `badge` — no en cada frame de `requestAnimationFrame`), y su
