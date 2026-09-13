@@ -10,4 +10,5 @@ export const GAME_ENGINES: Record<string, EngineLoader> = {
   caida: () => import("./caida/tetris-engine").then((m) => m.createTetrisEngine),
   "bloque-buster": () =>
     import("./bloque-buster/arkanoid-engine").then((m) => m.createArkanoidEngine),
+  serpentina: () => import("./serpentina/snake-engine").then((m) => m.createSnakeEngine),
 };

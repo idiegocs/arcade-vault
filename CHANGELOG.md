@@ -6,6 +6,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.2.4] - 2026-09-13
+
+Spec: [`10-serpentina-snake-motor-v0.2.4`](specs/10-serpentina-snake-motor-v0.2.4.md)
+
+### Added
+
+- Motor real del juego SERPENTINA (Snake), escrito desde cero sobre una grilla de 40×30 celdas de 20px: movimiento discreto que acelera por nivel, doble esquema de controles (flechas + WASD), fruta con sprite real migrado de `references/source-asset/snake-assets/fruits.png`, y sistema de 3 vidas que resetea la serpiente a longitud 3 sin resetear score/nivel.
+- Sonidos en SERPENTINA: comer fruta, choque.
+
 ## [0.2.3] - 2026-09-13
 
 Spec: [`09-bloque-buster-arkanoid-motor-v0.2.3`](specs/09-bloque-buster-arkanoid-motor-v0.2.3.md)
