@@ -82,7 +82,10 @@ export type SoundName =
   | "rotate"
   | "drop"
   | "lineClear"
-  | "topout"; // caida
+  | "topout" // caida
+  | "bounce"
+  | "brick"
+  | "lifeLost"; // bloque-buster
 
 /** Reproduce el sonido `name`. Los presets concretos se agregan a
  * continuación de este archivo, cada uno como una entrada de `SOUNDS`. */
@@ -109,4 +112,10 @@ const SOUNDS: Record<SoundName, () => void> = {
     beep(880, 0.14, "triangle", 0.15);
   },
   topout: () => beep(140, 0.4, "sawtooth", 0.2),
+  bounce: () => beep(600, 0.05, "square", 0.1),
+  brick: () => beep(340, 0.07, "square", 0.15),
+  lifeLost: () => {
+    beep(300, 0.15, "sawtooth", 0.18);
+    beep(180, 0.2, "sawtooth", 0.15);
+  },
 };

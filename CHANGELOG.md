@@ -6,6 +6,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.2.3] - 2026-09-13
+
+Spec: [`09-bloque-buster-arkanoid-motor-v0.2.3`](specs/09-bloque-buster-arkanoid-motor-v0.2.3.md)
+
+### Added
+
+- Motor real del juego BLOQUE BUSTER (Arkanoid), portado de `references/started-games/04-arkanoid`: los 5 niveles originales (layouts de bloques y velocidad de pelota crecientes, `1.00 → 1.46`), control de paleta por teclado y mouse, física de colisiones con animación de explosión por bloque, y sistema de 3 vidas que repone la pelota sin resetear score/nivel/bloques restantes.
+- Sonidos en BLOQUE BUSTER: rebote de pelota, bloque destruido, pérdida de vida.
+
 ## [0.2.2] - 2026-09-12
 
 Spec: [`08-libreria-sonido-motores-v0.2.2`](specs/08-libreria-sonido-motores-v0.2.2.md)
