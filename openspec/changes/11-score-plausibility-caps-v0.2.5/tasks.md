@@ -29,7 +29,7 @@ confirmed); debug route deleted.
 - [x] 2.1 Called `saveScore("bloque-buster", 2081)` — returned
       `{ ok: false, error: "Puntuación inválida." }`, no row inserted.
 - [x] 2.2 Called `saveScore("bloque-buster", 2080)` and `saveScore("rocas",
-    1000)` — both returned `{ ok: true }` and inserted normally (no
+  1000)` — both returned `{ ok: true }` and inserted normally (no
       regression for legitimate scores).
 - [x] 2.3 Called `saveScore("gloton", 1)` (one of the 4 catalog games with no
       registered engine) — rejected (fail closed for unconfigured games).
@@ -42,8 +42,8 @@ confirmed); debug route deleted.
 
 ## 3. Versioning
 
-- [ ] 3.1 Bump `version` in `package.json` to `0.2.5`.
-- [ ] 3.2 Add a `## [0.2.5]` entry to `CHANGELOG.md` following the existing
+- [x] 3.1 Bump `version` in `package.json` to `0.2.5`.
+- [x] 3.2 Add a `## [0.2.5]` entry to `CHANGELOG.md` following the existing
       format, linking to this change
       (`openspec/changes/11-score-plausibility-caps-v0.2.5`) and summarizing
       the server-side score cap under `### Added`.

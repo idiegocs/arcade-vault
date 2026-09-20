@@ -6,6 +6,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.2.5] - 2026-09-20
+
+Change: [`11-score-plausibility-caps-v0.2.5`](openspec/changes/11-score-plausibility-caps-v0.2.5/proposal.md)
+(primer change trackeado con OpenSpec en vez de `specs/`)
+
+### Added
+
+- Validación server-side de puntuaciones en `saveScore`: rechaza cualquier score por encima de un techo máximo plausible por juego, en vez de aceptar cualquier entero no negativo. BLOQUE BUSTER tiene un techo exacto (2080, derivado de sus 208 bloques en 5 niveles fijos); ROCAS, CAÍDA y SERPENTINA (efectivamente sin fin) tienen un techo de cordura generoso. Un `game_id` sin techo configurado (los 4 juegos del catálogo sin motor todavía) rechaza cualquier puntuación.
+
 ## [0.2.4] - 2026-09-13
 
 Spec: [`10-serpentina-snake-motor-v0.2.4`](specs/10-serpentina-snake-motor-v0.2.4.md)
