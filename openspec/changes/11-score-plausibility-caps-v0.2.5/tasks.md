@@ -15,18 +15,30 @@
 
 ## 2. Manual verification (no test runner in this repo)
 
-- [ ] 2.1 Via the dev server, log in and call `saveScore("bloque-buster",
-  2081)` from the browser console on `/juegos/bloque-buster/jugar` —
-      verify it returns `{ ok: false, ... }` and no row appears in `scores`.
-- [ ] 2.2 Call `saveScore("bloque-buster", 2080)` and `saveScore("rocas",
-  1000)` — verify both return `{ ok: true }` and insert normally (no
+`saveScore` isn't reachable as a plain function from the browser console (it's
+a Next.js Server Action, not a global) — verified instead via Playwright
+against the real dev server + real Supabase project, using a temporary debug
+route (`app/api/debug-save-score-temp/`, removed after) that called
+`saveScore` directly and returned its result as JSON, hit with a real
+authenticated session (a throwaway signup, `scorecap-test-20260920@example.com`,
+no email confirmation required — see `specs/04-supabase-auth-scores.md`).
+Each result cross-checked against the real `scores` table. Test user, its
+profile, and its scores deleted afterward (`scores_left: 0, profile_left: 0`
+confirmed); debug route deleted.
+
+- [x] 2.1 Called `saveScore("bloque-buster", 2081)` — returned
+      `{ ok: false, error: "Puntuación inválida." }`, no row inserted.
+- [x] 2.2 Called `saveScore("bloque-buster", 2080)` and `saveScore("rocas",
+    1000)` — both returned `{ ok: true }` and inserted normally (no
       regression for legitimate scores).
-- [ ] 2.3 Call `saveScore("<engine-less game id>", 1)` for one of the 4
-      catalog games with no registered engine — verify it's rejected (fail
-      closed for unconfigured games).
-- [ ] 2.4 Play a full BLOQUE BUSTER game to completion (win, all 5 levels) —
-      verify the shell's normal save flow still succeeds and the score
-      displayed matches what's persisted.
+- [x] 2.3 Called `saveScore("gloton", 1)` (one of the 4 catalog games with no
+      registered engine) — rejected (fail closed for unconfigured games).
+- [x] 2.4 Played BLOQUE BUSTER through the real shell to a natural game over
+      (lost all 3 lives; reaching a perfect 2080 clear isn't practical to
+      automate) — the shell's normal save flow (`game-player-shell.tsx`'s
+      auto-save on `phase: "gameover"`) still fired, the modal showed
+      "PUNTUACIÓN GUARDADA" with score 70, and `scores` had a matching
+      `bloque-buster` row at 70 — no regression.
 
 ## 3. Versioning
 
