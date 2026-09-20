@@ -46,3 +46,6 @@ next-env.d.ts
 
 # local secrets scratch files
 references/apk.txt
+
+# claude code
+.claude/
