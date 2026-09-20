@@ -31,6 +31,10 @@ This repo also ships two project-scoped skills under `.claude/skills/`: `add-gam
 
 Next.js 16.2.10 postdates this model's training data and has breaking changes vs. the Next.js you know from training — APIs, conventions, and file structure may differ. Before writing or editing any Next.js code (routing, data fetching, config, middleware, server/client component rules, etc.), read the relevant guide under `node_modules/next/dist/docs/` (App Router docs live under `01-app/`) instead of relying on prior knowledge, and heed any deprecation notices found there.
 
+## Git workflow
+
+**Never work directly on `master`, local or remote** — `master` is a protected branch on GitHub (PR required, `enforce_admins` on, no force-push, no deletion) and direct pushes are rejected anyway, but don't even commit to local `master`. Before making any commit, create/switch to a branch first — follow the repo's existing naming pattern `feature/spec-NN-slug-vX.Y.Z` (e.g. `feature/spec-11-score-plausibility-caps-v0.2.5`), matching the spec/change that motivated the work, whether it comes from `specs/` or `openspec/`. Open a PR (`gh pr create`) instead of pushing to `master`.
+
 ## Spec-driven workflow
 
 This repo runs **two** spec-driven systems side by side:
