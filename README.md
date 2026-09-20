@@ -15,6 +15,10 @@ https://github.com/Klerith/fernando-skills
 npx skills@latest add Klerith/fernando-skills
 ```
 
+## También usa OpenSpec
+
+Desde 2026-09-20 este repo además usa [OpenSpec](https://github.com/Fission-AI/OpenSpec) (`openspec/`), vía `/opsx:propose` → `/opsx:apply` → `/opsx:archive`. Los changes se numeran y versionan siguiendo la misma secuencia que `specs/` (ver `CLAUDE.md`, sección "Spec-driven workflow").
+
 ## Commands
 
 - `npm run dev` — start the dev server
