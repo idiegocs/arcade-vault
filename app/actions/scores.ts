@@ -6,6 +6,22 @@ import { createClient } from "@/lib/supabase/server";
 export type SaveScoreResult = { ok: true } | { ok: false; error: string };
 
 /**
+ * Techo de puntuación plausible por juego (`games.id`). Exacto para juegos
+ * con un final fijo y enumerable (BLOQUE BUSTER: 208 bloques × 10 pts en sus
+ * 5 niveles = 2080, ver design.md de
+ * `openspec/changes/11-score-plausibility-caps-v0.2.5`); "techo de cordura"
+ * generoso para los demás, que son efectivamente sin fin. Un `game_id` sin
+ * entrada acá no tiene puntuación válida (fail closed) — cubre también los
+ * juegos del catálogo que todavía no tienen motor.
+ */
+const MAX_PLAUSIBLE_SCORE: Record<string, number> = {
+  "bloque-buster": 2080,
+  rocas: 1_000_000,
+  caida: 1_000_000,
+  serpentina: 100_000,
+};
+
+/**
  * Guarda una puntuación para el usuario autenticado actual. Obtiene la
  * sesión server-side (nunca confía en un userId enviado por el cliente) y
  * respeta la RLS de `scores` (insert solo con `user_id = auth.uid()`).
@@ -13,6 +29,11 @@ export type SaveScoreResult = { ok: true } | { ok: false; error: string };
  */
 export async function saveScore(gameId: string, score: number): Promise<SaveScoreResult> {
   if (!Number.isInteger(score) || score < 0) {
+    return { ok: false, error: "Puntuación inválida." };
+  }
+
+  const maxScore = MAX_PLAUSIBLE_SCORE[gameId];
+  if (maxScore === undefined || score > maxScore) {
     return { ok: false, error: "Puntuación inválida." };
   }
 
