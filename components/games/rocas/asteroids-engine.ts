@@ -17,7 +17,21 @@ import {
   type EnginePhase,
   type EngineState,
 } from "../game-engine";
-import { playSound } from "../audio";
+import { beep, defineSounds } from "../audio";
+
+/** Sonidos de este juego (ver `defineSounds` en `../audio`). */
+const playSound = defineSounds({
+  shoot: () => beep(880, 0.08, "square", 0.12),
+  impact: () => beep(220, 0.1, "square", 0.15),
+  explosion: () => {
+    beep(120, 0.35, "sawtooth", 0.2);
+    beep(60, 0.35, "square", 0.15);
+  },
+  powerup: () => {
+    beep(660, 0.08, "triangle", 0.15);
+    beep(990, 0.12, "triangle", 0.15);
+  },
+});
 
 type Point = { x: number; y: number };
 

@@ -24,7 +24,19 @@ import {
   type EnginePhase,
   type EngineState,
 } from "../game-engine";
-import { playSound } from "../audio";
+import { beep, defineSounds } from "../audio";
+
+/** Sonidos de este juego (ver `defineSounds` en `../audio`). */
+const playSound = defineSounds({
+  rotate: () => beep(520, 0.05, "square", 0.1),
+  drop: () => beep(180, 0.08, "square", 0.15),
+  lineClear: () => {
+    beep(440, 0.09, "triangle", 0.15);
+    beep(660, 0.09, "triangle", 0.15);
+    beep(880, 0.14, "triangle", 0.15);
+  },
+  topout: () => beep(140, 0.4, "sawtooth", 0.2),
+});
 
 const COLS = 10;
 const ROWS = 20;
