@@ -36,7 +36,7 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     let cancelled = false;
     let handle: EngineHandle | null = null;
 
-    const loadEngine = GAME_ENGINES[gameId];
+    const loadEngine = GAME_ENGINES[gameId]?.load;
     if (!loadEngine) return;
 
     loadEngine().then((createEngine) => {

@@ -10,7 +10,7 @@ Arcade Vault — a platform for playing games online and competing on points/lea
 
 **`references/juegos-implementados.md` tracks which catalog games have a real engine.** Update it every time a game is added to or removed from `components/games/registry.ts` (or from the `games` table) — it's the source of truth for "which games exist and which have a real motor," kept separate from this file so this file doesn't go stale as the catalog grows.
 
-`app/actions/scores.ts` (`saveScore`) rejects any score above a per-game `MAX_PLAUSIBLE_SCORE` before persisting (added by OpenSpec change `11-score-plausibility-caps-v0.2.5`) — a new game's engine needs an entry there too, or every score it reports gets rejected (fail-closed for unconfigured games is intentional).
+`app/actions/scores.ts` (`saveScore`) rejects any score above the game's `maxPlausibleScore` before persisting (added by OpenSpec change `11-score-plausibility-caps-v0.2.5`). That cap lives in the game's own entry in `components/games/registry.ts`, next to its engine loader — a game with no registry entry gets every score rejected (fail-closed for unconfigured games is intentional). Game sounds likewise live in each engine (`defineSounds` from `components/games/audio.ts`, which only holds the shared infrastructure), so adding a game touches neither `audio.ts` nor `scores.ts`.
 
 ## Knowledge graph (Graphify)
 

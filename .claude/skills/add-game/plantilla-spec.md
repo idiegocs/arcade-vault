@@ -40,7 +40,8 @@ no un fix ni un cambio interno.
 **Incluye:**
 
 - `components/games/<id>/<archivo>.ts`: motor que exporta `create<Nombre>Engine: EngineFactory`, portado de `references/started-games/<carpeta>` [o: escrito desde cero].
-- `components/games/registry.ts`: agrega la línea `<id>: () => import("./<id>/<archivo>").then((m) => m.create<Nombre>Engine),`.
+- `components/games/registry.ts`: agrega la entrada `<id>: { load: () => import("./<id>/<archivo>").then((m) => m.create<Nombre>Engine), maxPlausibleScore: <techo> }` — `<techo>` exacto si el juego tiene un final enumerable, "techo de cordura" si es sin fin (ver spec `11-score-plausibility-caps-v0.2.5`).
+- (Si el juego tiene sonido) presets propios dentro del motor con `defineSounds` + `beep` de `components/games/audio.ts` — `audio.ts` no se modifica.
 - (Solo caso C) `sql/00N_add_game_<id>.sql`: `insert ... on conflict (id) do nothing` de la fila `<id>` en `games` (title, short, long, cat, cover, color, sort_order) — idempotente, nunca un `INSERT` a secas ni un `DROP`/`UPDATE` de filas existentes. Aplicado al proyecto real vía el MCP de Supabase (`apply_migration`), igual que specs 04/05/06.
 - (Solo si el cover es nuevo) bloque `.cover-<slug>` en `app/globals.css`, sección "Cover art generators".
 - `package.json`: version X.Y.Z → X.Y+1.0.
@@ -49,7 +50,7 @@ no un fix ni un cambio interno.
 **Fuera de alcance (para futuros specs):**
 
 - Controles táctiles/móvil (el contrato no los cubre hoy — `references/started-games` tampoco los tiene).
-- Audio (ningún motor del repo reproduce sonido hoy).
+- Audio con archivos (`.mp3`/`.wav`) — los motores sintetizan sus sonidos con `beep`.
 - `devicePixelRatio` / escalado por densidad de píxeles.
 - Validación en build de que cada clave de `registry.ts` tenga fila en `games` (spec 05 lo dejó fuera explícitamente).
 - Cambios a `game-player-shell.tsx`, `game-engine.ts` o `app/actions/scores.ts` — el contrato ya cubre este juego sin tocarlos; si no alcanzara, es señal de que el contrato necesita su propio spec, no un parche de paso.
@@ -103,7 +104,7 @@ cualquier score se pueda guardar):
 2. (Solo si el cover es nuevo) bloque `.cover-<slug>` en `app/globals.css`. Test manual: `/games` muestra la portada nueva (aunque el juego todavía no tenga motor, la fila ya existe y la card se renderiza).
 3. Esqueleto del motor en `components/games/<id>/<archivo>.ts`: factory, `ctx`, los 6 métodos del `EngineHandle`, el loop RAF, `reportState()` sin lógica de juego todavía. Test manual: `npm run lint`.
 4. [n pasos de mecánica del juego, cada uno ≤ 30-50 líneas]. Test manual: [acción concreta jugable].
-5. Línea en `components/games/registry.ts` con `import()` dinámico. Test manual: entrar a `/juegos/<id>/jugar` y ver el motor real en vez del mock.
+5. Entrada en `components/games/registry.ts` (`load` con `import()` dinámico + `maxPlausibleScore`). Test manual: entrar a `/juegos/<id>/jugar` y ver el motor real en vez del mock.
 6. `package.json` version bump + entrada en `CHANGELOG.md`. Test manual: el Footer muestra `vX.Y+1.0`.
 7. Verificación end-to-end completa (ver sección homónima en `add-game-impl/SKILL.md`). Test manual: partida completa con sesión activa, una fila nueva en `scores`, reflejada en `/juegos/<id>`, `/games` y `/salon-de-la-fama`.
 ```

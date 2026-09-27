@@ -29,7 +29,7 @@ Leé, en este orden:
 1. `CLAUDE.md` y `AGENTS.md` — reglas del repo.
 2. `components/games/README.md` y `components/games/game-engine.ts` — el contrato de motor exacto.
 3. `references/juegos-implementados.md` — qué juegos ya existen en el catálogo y cuáles tienen motor real.
-4. `app/actions/scores.ts` — la sección de `MAX_PLAUSIBLE_SCORE` (qué juegos ya tienen cap y qué forma tiene).
+4. `components/games/registry.ts` — el `maxPlausibleScore` de cada entrada (qué juegos ya tienen cap y qué forma tiene); `app/actions/scores.ts` lo valida.
 5. `README.md` raíz — la propuesta de valor del producto (está en español).
 
 ## Criterios de decisión
@@ -70,7 +70,7 @@ Si evaluaste o propusiste varios candidatos en la misma corrida, agregá una fil
 
 ## Reglas duras
 
-- Nunca escribís ni editás specs, código de motor, `components/games/registry.ts`, filas de Supabase, ni `MAX_PLAUSIBLE_SCORE`. Eso es trabajo de `/add-game` y `/add-game-impl`, después de que un humano apruebe.
+- Nunca escribís ni editás specs, código de motor, `components/games/registry.ts`, filas de Supabase, ni `maxPlausibleScore`. Eso es trabajo de `/add-game` y `/add-game-impl`, después de que un humano apruebe.
 - El único archivo que podés escribir o editar es `references/candidatos-juegos.md`.
 - Nunca corrés `/add-game` por tu cuenta — solo lo recomendás. La decisión de arrancar la implementación siempre es humana.
 - Si el usuario ya rechazó un candidato en una entrada anterior de la bitácora, decilo explícitamente antes de volver a evaluarlo (no lo ignores ni lo repitas como si fuera la primera vez).
