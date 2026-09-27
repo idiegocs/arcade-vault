@@ -6,6 +6,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.3.0] - 2026-09-27
+
+Sin spec: implementado con el agente `@skin-designer` (`.claude/agents/skin-designer.md`),
+tomando CAÍDA como referencia. Ver la sección "Skins" de `components/games/README.md`.
+
+### Added
+
+- Skins visuales CLÁSICO (default), NEÓN y RETRO en los 4 juegos con motor (CAÍDA, SERPENTINA, ROCAS, BLOQUE BUSTER), elegibles desde un selector en el HUD del reproductor. El cambio es en vivo, sin reiniciar la partida, y la elección se recuerda por juego. CLÁSICO conserva el look original; NEÓN dibuja tubos huecos con glow sobre un fondo synthwave; RETRO usa los 4 verdes de Game Boy con bordes duros y marcas de patrón. Solo visual: física, puntaje, controles y sonidos no cambian.
+- Contrato de skins en el motor (`REQUIRED_SKINS`, `SkinId`, `options.skin`, `setSkin`) y campo `skins` en `components/games/registry.ts`.
+
 ## [0.2.5] - 2026-09-20
 
 Change: [`11-score-plausibility-caps-v0.2.5`](openspec/changes/11-score-plausibility-caps-v0.2.5/proposal.md)
