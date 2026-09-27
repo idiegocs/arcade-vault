@@ -42,6 +42,7 @@ no un fix ni un cambio interno.
 - `components/games/<id>/<archivo>.ts`: motor que exporta `create<Nombre>Engine: EngineFactory`, portado de `references/started-games/<carpeta>` [o: escrito desde cero].
 - `components/games/registry.ts`: agrega la entrada `<id>: { load: () => import("./<id>/<archivo>").then((m) => m.create<Nombre>Engine), maxPlausibleScore: <techo> }` — `<techo>` exacto si el juego tiene un final enumerable, "techo de cordura" si es sin fin (ver spec `11-score-plausibility-caps-v0.2.5`).
 - (Si el juego tiene sonido) presets propios dentro del motor con `defineSounds` + `beep` de `components/games/audio.ts` — `audio.ts` no se modifica.
+- Skins `clasico` (default), `neon` y `retro` dentro del motor, según `components/games/README.md` § Skins (patrón de CAÍDA), y `skins: ["clasico", "neon", "retro"]` en su entrada de `registry.ts`. Si la infraestructura de skins todavía no existe, correr antes `@skin-designer caida`.
 - (Solo caso C) `sql/00N_add_game_<id>.sql`: `insert ... on conflict (id) do nothing` de la fila `<id>` en `games` (title, short, long, cat, cover, color, sort_order) — idempotente, nunca un `INSERT` a secas ni un `DROP`/`UPDATE` de filas existentes. Aplicado al proyecto real vía el MCP de Supabase (`apply_migration`), igual que specs 04/05/06.
 - (Solo si el cover es nuevo) bloque `.cover-<slug>` en `app/globals.css`, sección "Cover art generators".
 - `package.json`: version X.Y.Z → X.Y+1.0.

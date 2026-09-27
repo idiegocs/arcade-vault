@@ -16,13 +16,18 @@
  * - Sin tema claro/oscuro ni `localStorage` — el motor no toca el DOM fuera
  *   del canvas que recibe.
  * - Reporta su estado a React vía `onState`, solo cuando cambia.
+ * - Skins visuales (`clasico`/`neon`/`retro`, ver `SKINS`): referencia del
+ *   patrón de skins para el resto de los motores (sección "Skins" de
+ *   `../README.md`). Todo el dibujo lee de `palette`, nunca un literal.
  */
 import {
   ARENA_HEIGHT as H,
   ARENA_WIDTH as W,
+  DEFAULT_SKIN,
   type EngineFactory,
   type EnginePhase,
   type EngineState,
+  type SkinId,
 } from "../game-engine";
 import { beep, defineSounds } from "../audio";
 
@@ -51,17 +56,162 @@ const BOARD_OFFSET_Y = (H - BOARD_H) / 2;
 const NEXT_ORIGIN_X = BOARD_OFFSET_X + BOARD_W + 60;
 const NEXT_ORIGIN_Y = 70;
 
-const COLORS = [
-  null,
-  "#4dd0e1", // I - cyan
-  "#ffd54f", // O - amarillo
-  "#ba68c8", // T - violeta
-  "#81c784", // S - verde
-  "#e57373", // Z - rojo
-  "#90caf9", // J - celeste
-  "#ffb74d", // L - naranja
-  "#9e9e9e", // N - "tuerca" (gris metálico, pieza propia del original)
-] as const;
+// ── Skins ─────────────────────────────────────────────────────────────
+/** Marca interior de un bloque — permite distinguir piezas que comparten
+ * tono en paletas reducidas (RETRO). */
+type BlockMark = "none" | "dot" | "inset" | "stripe" | "cross";
+
+type PieceStyle = {
+  fill: string;
+  mark: BlockMark;
+  markColor: string;
+};
+
+type TetrisPalette = {
+  /** Fondo de todo el canvas. */
+  background: string;
+  /** Relleno del área del tablero (`null` = se ve `background`). */
+  boardBackground: string | null;
+  gridLine: string | null;
+  gridLineWidth: number;
+  frame: string;
+  frameWidth: number;
+  /** `shadowBlur` del marco del tablero (0 = sin glow). */
+  frameGlow: number;
+  /** Índice = tipo de pieza (0 sin uso, 1..8 = I O T S Z J L N). */
+  pieces: readonly PieceStyle[];
+  /** Color si un índice no tiene estilo (no debería pasar). */
+  fallbackFill: string;
+  /** Franja de brillo superior de cada bloque (`null` = sin franja). */
+  highlight: string | null;
+  highlightHeight: number;
+  /** Borde duro alrededor de cada bloque (`null` = sin borde). */
+  blockEdge: string | null;
+  blockEdgeWidth: number;
+  /** `shadowBlur` de los bloques; el `shadowColor` es el `fill` de la pieza. */
+  blockGlow: number;
+  /** Bloques como "tubo de neón": contorno brillante del color de la pieza,
+   * relleno casi transparente y un núcleo blanco fino (`null` = bloque sólido). */
+  tube: { lineWidth: number; fillAlpha: number; core: string } | null;
+  /** Pieza fantasma: misma pieza con alpha, o solo contorno (sin transparencias). */
+  ghost: { kind: "faded"; alpha: number } | { kind: "outline"; color: string; width: number };
+  /** Texto "SIGUIENTE". */
+  label: string;
+  labelFont: string;
+  /** Caja detrás de la vista previa de la próxima pieza (`null` = sin caja). */
+  previewBox: { fill: string; border: string; borderWidth: number } | null;
+};
+
+const piece = (fill: string, mark: BlockMark = "none", markColor = fill): PieceStyle => ({
+  fill,
+  mark,
+  markColor,
+});
+
+/** Game Boy DMG: los 4 verdes, de más oscuro a más claro. */
+const GB = { darkest: "#0f380f", dark: "#306230", light: "#8bac0f", lightest: "#9bbc0f" };
+
+const SKINS: Record<SkinId, TetrisPalette> = {
+  // Look original del motor, copiado tal cual.
+  clasico: {
+    background: "#000",
+    boardBackground: null,
+    gridLine: "rgba(255,255,255,0.08)",
+    gridLineWidth: 0.5,
+    frame: "rgba(255,255,255,0.35)",
+    frameWidth: 1,
+    frameGlow: 0,
+    pieces: [
+      piece("#fff"), // 0 - sin uso
+      piece("#4dd0e1"), // I - cyan
+      piece("#ffd54f"), // O - amarillo
+      piece("#ba68c8"), // T - violeta
+      piece("#81c784"), // S - verde
+      piece("#e57373"), // Z - rojo
+      piece("#90caf9"), // J - celeste
+      piece("#ffb74d"), // L - naranja
+      piece("#9e9e9e"), // N - "tuerca" (gris metálico, pieza propia del original)
+    ],
+    fallbackFill: "#fff",
+    highlight: "rgba(255,255,255,0.12)",
+    highlightHeight: 4,
+    blockEdge: null,
+    blockEdgeWidth: 0,
+    blockGlow: 0,
+    tube: null,
+    ghost: { kind: "faded", alpha: 0.2 },
+    label: "rgba(255,255,255,0.5)",
+    labelFont: "10px monospace",
+    previewBox: null,
+  },
+  // Synthwave: tubos de neón huecos con glow fuerte sobre un fondo violeta
+  // con grilla magenta — tiene que leerse distinto del clásico de un vistazo,
+  // no solo con otros colores.
+  neon: {
+    background: "#0b0016",
+    boardBackground: "#12002a",
+    gridLine: "rgba(255,43,214,0.16)",
+    gridLineWidth: 1,
+    frame: "#ff2bd6",
+    frameWidth: 3,
+    frameGlow: 24,
+    pieces: [
+      piece("#ffffff"),
+      piece("#00f5ff"), // I - cyan
+      piece("#f5ff00"), // O - amarillo
+      piece("#b026ff"), // T - violeta
+      piece("#00ff88"), // S - verde
+      piece("#ff006e"), // Z - magenta
+      piece("#2d7bff"), // J - azul eléctrico
+      piece("#ff8a00"), // L - naranja
+      piece("#e6e9ff"), // N - tuerca (blanco plasma)
+    ],
+    fallbackFill: "#ffffff",
+    highlight: null,
+    highlightHeight: 0,
+    blockEdge: null,
+    blockEdgeWidth: 0,
+    blockGlow: 16,
+    tube: { lineWidth: 3, fillAlpha: 0.14, core: "rgba(255,255,255,0.85)" },
+    ghost: { kind: "outline", color: "rgba(255,43,214,0.45)", width: 1 },
+    label: "#ff2bd6",
+    labelFont: "bold 11px monospace",
+    previewBox: null,
+  },
+  // 4 verdes de Game Boy, bordes duros, sin glow ni alpha. Las piezas que
+  // comparten tono se distinguen por la marca interior.
+  retro: {
+    background: GB.dark,
+    boardBackground: GB.lightest,
+    gridLine: GB.light,
+    gridLineWidth: 1,
+    frame: GB.darkest,
+    frameWidth: 4,
+    frameGlow: 0,
+    pieces: [
+      piece(GB.darkest),
+      piece(GB.darkest), // I - liso oscuro
+      piece(GB.dark), // O - liso medio
+      piece(GB.light, "dot", GB.darkest), // T - claro con punto
+      piece(GB.dark, "dot", GB.lightest), // S - medio con punto
+      piece(GB.darkest, "inset", GB.light), // Z - oscuro con cuadro interior
+      piece(GB.light, "inset", GB.dark), // J - claro con cuadro interior
+      piece(GB.dark, "stripe", GB.light), // L - medio con franja
+      piece(GB.light, "cross", GB.darkest), // N - tuerca: claro con cruz
+    ],
+    fallbackFill: GB.darkest,
+    highlight: null,
+    highlightHeight: 0,
+    blockEdge: GB.darkest,
+    blockEdgeWidth: 2,
+    blockGlow: 0,
+    tube: null,
+    ghost: { kind: "outline", color: GB.dark, width: 2 },
+    label: GB.lightest,
+    labelFont: "bold 10px monospace",
+    previewBox: { fill: GB.lightest, border: GB.darkest, borderWidth: 4 },
+  },
+};
 
 const PIECES: number[][][] = [
   [],
@@ -111,9 +261,12 @@ const LINE_SCORES = [0, 100, 300, 500, 800];
 
 type Piece = { type: number; shape: number[][]; x: number; y: number };
 
-export const createTetrisEngine: EngineFactory = (canvas, onState) => {
+export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
+
+  /** Paleta activa — solo visual; `setSkin` la reasigna en vivo. */
+  let palette: TetrisPalette = SKINS[options?.skin ?? DEFAULT_SKIN] ?? SKINS[DEFAULT_SKIN];
 
   // ── Input ──────────────────────────────────────────────────────────────
   const keys: Record<string, boolean> = {};
@@ -373,53 +526,161 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
   }
 
   // ── Draw ──────────────────────────────────────────────────────────────
+  /** Marca interior (solo paletas con `mark`, ej. RETRO) sobre el área
+   * `(ix, iy, is)` del bloque, con rectángulos enteros — bordes duros. */
+  function drawMark(
+    context: CanvasRenderingContext2D,
+    style: PieceStyle,
+    ix: number,
+    iy: number,
+    is: number
+  ) {
+    const half = Math.floor(is / 2);
+    context.fillStyle = style.markColor;
+    switch (style.mark) {
+      case "dot":
+        context.fillRect(ix + half - 3, iy + half - 3, 6, 6);
+        break;
+      case "inset":
+        context.fillRect(ix + 4, iy + 4, is - 8, is - 8);
+        context.fillStyle = style.fill;
+        context.fillRect(ix + 7, iy + 7, is - 14, is - 14);
+        break;
+      case "stripe":
+        context.fillRect(ix, iy + half - 2, is, 4);
+        break;
+      case "cross":
+        context.fillRect(ix + half - 2, iy + 4, 4, is - 8);
+        context.fillRect(ix + 4, iy + half - 2, is - 8, 4);
+        break;
+      case "none":
+        break;
+    }
+  }
+
   function drawBlock(
     context: CanvasRenderingContext2D,
     x: number,
     y: number,
     colorIndex: number,
     size: number,
-    alpha = 1
+    ghost = false
   ) {
     if (!colorIndex) return;
-    context.globalAlpha = alpha;
-    context.fillStyle = COLORS[colorIndex] ?? "#fff";
-    context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-    context.fillStyle = "rgba(255,255,255,0.12)";
-    context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+    const style = palette.pieces[colorIndex];
+    const fill = style?.fill ?? palette.fallbackFill;
+    const px = x * size + 1;
+    const py = y * size + 1;
+    const s = size - 2;
+
+    if (ghost && palette.ghost.kind === "outline") {
+      const w = palette.ghost.width;
+      context.strokeStyle = palette.ghost.color;
+      context.lineWidth = w;
+      context.strokeRect(px + w / 2, py + w / 2, s - w, s - w);
+      return;
+    }
+
+    if (ghost && palette.ghost.kind === "faded") context.globalAlpha = palette.ghost.alpha;
+
+    // El glow no se paga en la pieza fantasma.
+    const glow = ghost ? 0 : palette.blockGlow;
+
+    const tube = palette.tube;
+    if (tube) {
+      const base = context.globalAlpha;
+      const inset = tube.lineWidth / 2 + 1;
+      context.globalAlpha = base * tube.fillAlpha;
+      context.fillStyle = fill;
+      context.fillRect(px, py, s, s);
+      context.globalAlpha = base;
+      if (glow > 0) {
+        context.shadowColor = fill;
+        context.shadowBlur = glow;
+      }
+      context.strokeStyle = fill;
+      context.lineWidth = tube.lineWidth;
+      context.strokeRect(px + inset, py + inset, s - 2 * inset, s - 2 * inset);
+      context.shadowBlur = 0;
+      context.strokeStyle = tube.core;
+      context.lineWidth = 1;
+      context.strokeRect(px + inset, py + inset, s - 2 * inset, s - 2 * inset);
+      context.globalAlpha = 1;
+      return;
+    }
+    if (glow > 0) {
+      context.shadowColor = fill;
+      context.shadowBlur = glow;
+    }
+    const e = palette.blockEdge ? palette.blockEdgeWidth : 0;
+    if (palette.blockEdge) {
+      context.fillStyle = palette.blockEdge;
+      context.fillRect(px, py, s, s);
+      context.shadowBlur = 0;
+    }
+    context.fillStyle = fill;
+    context.fillRect(px + e, py + e, s - 2 * e, s - 2 * e);
+    if (glow > 0) context.shadowBlur = 0;
+
+    if (palette.highlight) {
+      context.fillStyle = palette.highlight;
+      context.fillRect(px, py, s, palette.highlightHeight);
+    }
+    if (style && style.mark !== "none") drawMark(context, style, px + e, py + e, s - 2 * e);
+
     context.globalAlpha = 1;
   }
 
   function drawBoardFrame() {
-    ctx!.strokeStyle = "rgba(255,255,255,0.08)";
-    ctx!.lineWidth = 0.5;
-    for (let c = 1; c < COLS; c++) {
-      ctx!.beginPath();
-      ctx!.moveTo(c * BLOCK, 0);
-      ctx!.lineTo(c * BLOCK, BOARD_H);
-      ctx!.stroke();
+    if (palette.boardBackground) {
+      ctx!.fillStyle = palette.boardBackground;
+      ctx!.fillRect(0, 0, BOARD_W, BOARD_H);
     }
-    for (let r = 1; r < ROWS; r++) {
-      ctx!.beginPath();
-      ctx!.moveTo(0, r * BLOCK);
-      ctx!.lineTo(BOARD_W, r * BLOCK);
-      ctx!.stroke();
+    if (palette.gridLine) {
+      ctx!.strokeStyle = palette.gridLine;
+      ctx!.lineWidth = palette.gridLineWidth;
+      for (let c = 1; c < COLS; c++) {
+        ctx!.beginPath();
+        ctx!.moveTo(c * BLOCK, 0);
+        ctx!.lineTo(c * BLOCK, BOARD_H);
+        ctx!.stroke();
+      }
+      for (let r = 1; r < ROWS; r++) {
+        ctx!.beginPath();
+        ctx!.moveTo(0, r * BLOCK);
+        ctx!.lineTo(BOARD_W, r * BLOCK);
+        ctx!.stroke();
+      }
     }
-    ctx!.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx!.lineWidth = 1;
+    if (palette.frameGlow > 0) {
+      ctx!.shadowColor = palette.frame;
+      ctx!.shadowBlur = palette.frameGlow;
+    }
+    ctx!.strokeStyle = palette.frame;
+    ctx!.lineWidth = palette.frameWidth;
     ctx!.strokeRect(0, 0, BOARD_W, BOARD_H);
+    ctx!.shadowBlur = 0;
   }
 
   function drawNextPreview() {
     ctx!.save();
-    ctx!.font = "10px monospace";
-    ctx!.fillStyle = "rgba(255,255,255,0.5)";
+    ctx!.font = palette.labelFont;
+    ctx!.fillStyle = palette.label;
     ctx!.fillText("SIGUIENTE", NEXT_ORIGIN_X, NEXT_ORIGIN_Y - 16);
 
     const shape = next.shape;
     const offX = Math.floor((4 - shape[0].length) / 2);
     const offY = Math.floor((4 - shape.length) / 2);
     ctx!.translate(NEXT_ORIGIN_X, NEXT_ORIGIN_Y);
+    const box = palette.previewBox;
+    if (box) {
+      const side = 4 * BLOCK;
+      ctx!.fillStyle = box.fill;
+      ctx!.fillRect(-6, -6, side + 12, side + 12);
+      ctx!.strokeStyle = box.border;
+      ctx!.lineWidth = box.borderWidth;
+      ctx!.strokeRect(-6, -6, side + 12, side + 12);
+    }
     for (let r = 0; r < shape.length; r++) {
       for (let c = 0; c < shape[r].length; c++) {
         drawBlock(ctx!, offX + c, offY + r, shape[r][c], BLOCK);
@@ -429,7 +690,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
   }
 
   function draw() {
-    ctx!.fillStyle = "#000";
+    ctx!.fillStyle = palette.background;
     ctx!.fillRect(0, 0, W, H);
 
     ctx!.save();
@@ -448,7 +709,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
     for (let r = 0; r < current.shape.length; r++) {
       for (let c = 0; c < current.shape[r].length; c++) {
         if (current.shape[r][c])
-          drawBlock(ctx!, current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
+          drawBlock(ctx!, current.x + c, gy + r, current.shape[r][c], BLOCK, true);
       }
     }
 
@@ -520,6 +781,11 @@ export const createTetrisEngine: EngineFactory = (canvas, onState) => {
         rafId = requestAnimationFrame(loop);
       }
       reportState();
+    },
+    setSkin(skin: SkinId) {
+      palette = SKINS[skin] ?? SKINS[DEFAULT_SKIN];
+      // En pausa no hay frames corriendo: redibuja una vez para que se vea.
+      if (rafId === null) draw();
     },
     destroy() {
       if (rafId !== null) cancelAnimationFrame(rafId);

@@ -17,13 +17,20 @@
  * - El spritesheet se carga de forma perezosa/asíncrona; el motor no dibuja
  *   sprites hasta que termina de cargar.
  * - Sin badge — este juego no tiene un indicador extra natural.
+ * - Skins visuales (`clasico`/`neon`/`retro`, ver `SKINS`), con el patrón de
+ *   CAÍDA (sección "Skins" de `../README.md`). CLÁSICO dibuja el spritesheet
+ *   original tal cual; NEÓN y RETRO son vectoriales y no esperan a que cargue.
+ *   Todo el dibujo lee de `palette`, nunca un literal. Solo visual: física,
+ *   tamaños, hitboxes, niveles, puntaje, controles y sonidos no cambian.
  */
 import {
   ARENA_HEIGHT as H,
   ARENA_WIDTH as W,
+  DEFAULT_SKIN,
   type EngineFactory,
   type EnginePhase,
   type EngineState,
+  type SkinId,
 } from "../game-engine";
 import { beep, defineSounds } from "../audio";
 
@@ -174,6 +181,131 @@ const EXPLOSION_FRAMES: Record<BlockColor, SpriteRect[]> = {
   ],
 };
 
+// ── Skins ─────────────────────────────────────────────────────────────
+/** Marca interior de un ladrillo — distingue colores que comparten tono en
+ * paletas reducidas (RETRO). */
+type BrickMark = "none" | "dot" | "inset" | "stripe" | "cross";
+
+type BrickStyle = { fill: string; mark: BrickMark; markColor: string };
+
+type ArkanoidPalette = {
+  /** Fondo de todo el canvas. */
+  background: string;
+  /** `true` = dibuja con el spritesheet original (CLÁSICO); `false` = vectorial. */
+  sprites: boolean;
+  /** Piso synthwave en perspectiva desde `top` hasta abajo (`null` = sin piso). */
+  floor: { top: number; fill: string; line: string; lineWidth: number; horizon: string } | null;
+  /** Marco sobre las paredes que rebotan: izquierda, techo y derecha. */
+  frame: { color: string; width: number; glow: number } | null;
+  /** Estilo por color de ladrillo (solo modo vectorial). */
+  bricks: Record<BlockColor, BrickStyle>;
+  /** Borde duro alrededor de ladrillos/paleta/pelota (`null` = sin borde). */
+  edge: string | null;
+  edgeWidth: number;
+  /** `shadowBlur` de las entidades; el `shadowColor` es su color. */
+  glow: number;
+  /** Entidades como "tubo de neón": contorno brillante del color, relleno
+   * casi transparente y un núcleo fino (`null` = relleno sólido). */
+  tube: { lineWidth: number; fillAlpha: number; core: string } | null;
+  /** Paleta del jugador; `cap` = tapas en los extremos (`null` = sin tapas). */
+  paddle: { fill: string; cap: string | null };
+  /** Pelota: `round` = círculo con glow, `square` = pixel de 8 bits con brillo. */
+  ball: { fill: string; glowColor: string; shape: "round" | "square"; highlight: string | null };
+  /** Explosión: `sprite` = frames del spritesheet, `burst` = contorno que se
+   * expande y se apaga, `crumble` = ladrillo que se achica en 4 pasos duros. */
+  explosion: "sprite" | "burst" | "crumble";
+};
+
+const brick = (fill: string, mark: BrickMark = "none", markColor = fill): BrickStyle => ({
+  fill,
+  mark,
+  markColor,
+});
+
+/** Game Boy DMG: los 4 verdes, de más oscuro a más claro. */
+const GB = { darkest: "#0f380f", dark: "#306230", light: "#8bac0f", lightest: "#9bbc0f" };
+
+const SKINS: Record<SkinId, ArkanoidPalette> = {
+  // Look original del motor: fondo negro + spritesheet, tal cual. Los
+  // `bricks`/`paddle`/`ball` no se usan en modo sprite (están por tipo).
+  clasico: {
+    background: "#000",
+    sprites: true,
+    floor: null,
+    frame: null,
+    bricks: {
+      gray: brick("#9e9e9e"),
+      red: brick("#e53935"),
+      yellow: brick("#fdd835"),
+      cyan: brick("#26c6da"),
+      magenta: brick("#ab47bc"),
+      hotpink: brick("#ec407a"),
+      green: brick("#66bb6a"),
+    },
+    edge: null,
+    edgeWidth: 0,
+    glow: 0,
+    tube: null,
+    paddle: { fill: "#fff", cap: null },
+    ball: { fill: "#fff", glowColor: "#fff", shape: "round", highlight: null },
+    explosion: "sprite",
+  },
+  // Synthwave: tubos de neón huecos con glow fuerte y un piso en perspectiva
+  // con grilla magenta — se lee distinto del clásico de un vistazo.
+  neon: {
+    background: "#0b0016",
+    sprites: false,
+    floor: {
+      top: 380,
+      fill: "#12002a",
+      line: "rgba(255,43,214,0.22)",
+      lineWidth: 1,
+      horizon: "#ff2bd6",
+    },
+    frame: { color: "#ff2bd6", width: 3, glow: 24 },
+    bricks: {
+      gray: brick("#e6e9ff"), // blanco plasma
+      red: brick("#ff3b30"),
+      yellow: brick("#f5ff00"),
+      cyan: brick("#00f5ff"),
+      magenta: brick("#b026ff"), // violeta
+      hotpink: brick("#ff2bd6"),
+      green: brick("#00ff88"),
+    },
+    edge: null,
+    edgeWidth: 0,
+    glow: 16,
+    tube: { lineWidth: 3, fillAlpha: 0.14, core: "rgba(255,255,255,0.85)" },
+    paddle: { fill: "#00f5ff", cap: "#ffffff" },
+    ball: { fill: "#ffffff", glowColor: "#f5ff00", shape: "round", highlight: null },
+    explosion: "burst",
+  },
+  // 4 verdes de Game Boy, bordes duros, sin glow ni alpha. Los colores que
+  // comparten tono se distinguen por la marca interior.
+  retro: {
+    background: GB.lightest,
+    sprites: false,
+    floor: null,
+    frame: { color: GB.darkest, width: 4, glow: 0 },
+    bricks: {
+      gray: brick(GB.dark, "cross", GB.lightest), // medio con cruz
+      red: brick(GB.darkest), // liso oscuro
+      yellow: brick(GB.light, "dot", GB.darkest), // claro con punto
+      cyan: brick(GB.dark), // liso medio
+      magenta: brick(GB.darkest, "inset", GB.light), // oscuro con cuadro interior
+      hotpink: brick(GB.light, "stripe", GB.darkest), // claro con franja
+      green: brick(GB.dark, "dot", GB.lightest), // medio con punto claro
+    },
+    edge: GB.darkest,
+    edgeWidth: 2,
+    glow: 0,
+    tube: null,
+    paddle: { fill: GB.darkest, cap: GB.light },
+    ball: { fill: GB.darkest, glowColor: GB.darkest, shape: "square", highlight: GB.lightest },
+    explosion: "crumble",
+  },
+};
+
 /**
  * Cache de módulo: la imagen decodificada se comparte entre instancias del
  * motor (remounts de Strict Mode, o volver a entrar al juego) sin volver a
@@ -223,9 +355,12 @@ function drawFrame(
   context.drawImage(ssCanvas, frame.sx, frame.sy, frame.sw, frame.sh, x, y, w, h);
 }
 
-export const createArkanoidEngine: EngineFactory = (canvas, onState) => {
+export const createArkanoidEngine: EngineFactory = (canvas, onState, options) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
+
+  /** Paleta activa — solo visual; `setSkin` la reasigna en vivo. */
+  let palette: ArkanoidPalette = SKINS[options?.skin ?? DEFAULT_SKIN] ?? SKINS[DEFAULT_SKIN];
 
   let spriteReady = ssLoaded;
   if (!spriteReady) {
@@ -431,24 +566,213 @@ export const createArkanoidEngine: EngineFactory = (canvas, onState) => {
   }
 
   // ── Draw ──────────────────────────────────────────────────────────────
+  /** Marca interior (RETRO) sobre el área `(ix, iy, iw, ih)`, con
+   * rectángulos enteros — bordes duros. */
+  function drawMark(style: BrickStyle, ix: number, iy: number, iw: number, ih: number) {
+    const cx = ix + Math.floor(iw / 2);
+    const cy = iy + Math.floor(ih / 2);
+    ctx!.fillStyle = style.markColor;
+    switch (style.mark) {
+      case "dot":
+        ctx!.fillRect(cx - 3, cy - 3, 6, 6);
+        break;
+      case "inset":
+        ctx!.fillRect(ix + 4, iy + 4, iw - 8, ih - 8);
+        ctx!.fillStyle = style.fill;
+        ctx!.fillRect(ix + 7, iy + 7, iw - 14, ih - 14);
+        break;
+      case "stripe":
+        ctx!.fillRect(ix, cy - 2, iw, 4);
+        break;
+      case "cross":
+        ctx!.fillRect(cx - 2, iy + 3, 4, ih - 6);
+        ctx!.fillRect(cx - 10, cy - 2, 20, 4);
+        break;
+      case "none":
+        break;
+    }
+  }
+
+  /** Rectángulo de una entidad según la paleta: tubo de neón hueco, o
+   * relleno sólido con borde duro opcional. */
+  function drawBox(x: number, y: number, w: number, h: number, fill: string) {
+    const tube = palette.tube;
+    if (tube) {
+      const inset = tube.lineWidth / 2 + 1;
+      ctx!.globalAlpha = tube.fillAlpha;
+      ctx!.fillStyle = fill;
+      ctx!.fillRect(x, y, w, h);
+      ctx!.globalAlpha = 1;
+      if (palette.glow > 0) {
+        ctx!.shadowColor = fill;
+        ctx!.shadowBlur = palette.glow;
+      }
+      ctx!.strokeStyle = fill;
+      ctx!.lineWidth = tube.lineWidth;
+      ctx!.strokeRect(x + inset, y + inset, w - 2 * inset, h - 2 * inset);
+      ctx!.shadowBlur = 0;
+      ctx!.strokeStyle = tube.core;
+      ctx!.lineWidth = 1;
+      ctx!.strokeRect(x + inset, y + inset, w - 2 * inset, h - 2 * inset);
+      return;
+    }
+    const e = palette.edge ? palette.edgeWidth : 0;
+    if (palette.edge) {
+      ctx!.fillStyle = palette.edge;
+      ctx!.fillRect(x, y, w, h);
+    }
+    ctx!.fillStyle = fill;
+    ctx!.fillRect(x + e, y + e, w - 2 * e, h - 2 * e);
+  }
+
+  function drawBrick(block: Block) {
+    const style = palette.bricks[block.color];
+    // 1px de separación visual entre ladrillos; la hitbox no cambia.
+    const x = block.x + 1;
+    const y = block.y + 1;
+    const w = block.w - 2;
+    const h = block.h - 2;
+    drawBox(x, y, w, h, style.fill);
+    if (!palette.tube && style.mark !== "none") {
+      const e = palette.edge ? palette.edgeWidth : 0;
+      drawMark(style, x + e, y + e, w - 2 * e, h - 2 * e);
+    }
+  }
+
+  function drawExplosion(exp: Explosion) {
+    const t = Math.min(exp.elapsed / EXPLOSION_DURATION, 1);
+    const style = palette.bricks[exp.color];
+    if (palette.explosion === "burst") {
+      const grow = t * 10;
+      ctx!.globalAlpha = 1 - t;
+      if (palette.glow > 0) {
+        ctx!.shadowColor = style.fill;
+        ctx!.shadowBlur = palette.glow;
+      }
+      ctx!.strokeStyle = style.fill;
+      ctx!.lineWidth = 2;
+      ctx!.strokeRect(exp.x - grow, exp.y - grow, exp.w + 2 * grow, exp.h + 2 * grow);
+      ctx!.shadowBlur = 0;
+      ctx!.globalAlpha = 1;
+      return;
+    }
+    // crumble: 4 pasos duros, el ladrillo se achica hacia el centro.
+    const step = Math.min(Math.floor(t * 4), 3);
+    const ix = 6 + step * 7;
+    const iy = 2 + step * 2;
+    drawBox(exp.x + ix, exp.y + iy, exp.w - 2 * ix, exp.h - 2 * iy, style.fill);
+  }
+
+  function drawPaddle() {
+    const p = palette.paddle;
+    drawBox(paddle.x, paddle.y, paddle.w, paddle.h, p.fill);
+    if (p.cap) {
+      // Tapas en los extremos: la paleta se distingue de un ladrillo del mismo tono.
+      ctx!.fillStyle = p.cap;
+      const capH = paddle.h - 6;
+      ctx!.fillRect(paddle.x + 5, paddle.y + 3, 6, capH);
+      ctx!.fillRect(paddle.x + paddle.w - 11, paddle.y + 3, 6, capH);
+    }
+  }
+
+  function drawBall() {
+    const b = palette.ball;
+    if (b.shape === "square") {
+      const e = palette.edge ? palette.edgeWidth : 0;
+      ctx!.fillStyle = b.fill;
+      ctx!.fillRect(ball.x + e, ball.y + e, ball.w - 2 * e, ball.h - 2 * e);
+      if (b.highlight) {
+        ctx!.fillStyle = b.highlight;
+        ctx!.fillRect(ball.x + e + 2, ball.y + e + 2, 4, 4);
+      }
+      return;
+    }
+    if (palette.glow > 0) {
+      ctx!.shadowColor = b.glowColor;
+      ctx!.shadowBlur = palette.glow + 8;
+    }
+    ctx!.fillStyle = b.fill;
+    ctx!.beginPath();
+    ctx!.arc(ball.x + ball.w / 2, ball.y + ball.h / 2, ball.w / 2 - 1, 0, Math.PI * 2);
+    ctx!.fill();
+    ctx!.shadowBlur = 0;
+  }
+
+  /** Piso en perspectiva (NEÓN) y marco sobre las paredes que rebotan. */
+  function drawArena() {
+    const floor = palette.floor;
+    if (floor) {
+      const depth = H - floor.top;
+      ctx!.fillStyle = floor.fill;
+      ctx!.fillRect(0, floor.top, W, depth);
+      ctx!.strokeStyle = floor.line;
+      ctx!.lineWidth = floor.lineWidth;
+      ctx!.beginPath();
+      // Verticales que convergen hacia el centro del horizonte.
+      for (let k = -10; k <= 10; k++) {
+        ctx!.moveTo(W / 2 + k * 20, floor.top);
+        ctx!.lineTo(W / 2 + k * 90, H);
+      }
+      // Horizontales cada vez más juntas hacia el horizonte.
+      for (let n = 1; n <= 8; n++) {
+        const y = floor.top + depth * (n / 8) ** 2;
+        ctx!.moveTo(0, y);
+        ctx!.lineTo(W, y);
+      }
+      ctx!.stroke();
+      ctx!.strokeStyle = floor.horizon;
+      ctx!.lineWidth = 2;
+      ctx!.beginPath();
+      ctx!.moveTo(0, floor.top);
+      ctx!.lineTo(W, floor.top);
+      ctx!.stroke();
+    }
+    const frame = palette.frame;
+    if (frame) {
+      if (frame.glow > 0) {
+        ctx!.shadowColor = frame.color;
+        ctx!.shadowBlur = frame.glow;
+      }
+      const half = frame.width / 2;
+      ctx!.strokeStyle = frame.color;
+      ctx!.lineWidth = frame.width;
+      ctx!.beginPath();
+      ctx!.moveTo(half, H);
+      ctx!.lineTo(half, half);
+      ctx!.lineTo(W - half, half);
+      ctx!.lineTo(W - half, H);
+      ctx!.stroke();
+      ctx!.shadowBlur = 0;
+    }
+  }
+
   function draw() {
-    ctx!.fillStyle = "#000";
+    ctx!.fillStyle = palette.background;
     ctx!.fillRect(0, 0, W, H);
 
-    if (!spriteReady) return;
+    if (palette.sprites) {
+      if (!spriteReady) return;
 
-    for (const block of blocks) {
-      if (block.alive)
-        drawFrame(ctx!, SPRITES.blocks[block.color], block.x, block.y, block.w, block.h);
+      for (const block of blocks) {
+        if (block.alive)
+          drawFrame(ctx!, SPRITES.blocks[block.color], block.x, block.y, block.w, block.h);
+      }
+
+      for (const exp of explosions) {
+        const frameIndex = Math.min(Math.floor((exp.elapsed / EXPLOSION_DURATION) * 4), 3);
+        drawFrame(ctx!, EXPLOSION_FRAMES[exp.color][frameIndex], exp.x, exp.y, exp.w, exp.h);
+      }
+
+      drawFrame(ctx!, SPRITES.paddle, paddle.x, paddle.y, paddle.w, paddle.h);
+      drawFrame(ctx!, SPRITES.ball, ball.x, ball.y, ball.w, ball.h);
+      return;
     }
 
-    for (const exp of explosions) {
-      const frameIndex = Math.min(Math.floor((exp.elapsed / EXPLOSION_DURATION) * 4), 3);
-      drawFrame(ctx!, EXPLOSION_FRAMES[exp.color][frameIndex], exp.x, exp.y, exp.w, exp.h);
-    }
-
-    drawFrame(ctx!, SPRITES.paddle, paddle.x, paddle.y, paddle.w, paddle.h);
-    drawFrame(ctx!, SPRITES.ball, ball.x, ball.y, ball.w, ball.h);
+    drawArena();
+    for (const block of blocks) if (block.alive) drawBrick(block);
+    for (const exp of explosions) drawExplosion(exp);
+    drawPaddle();
+    drawBall();
   }
 
   // ── Loop principal ──────────────────────────────────────────────────
@@ -506,6 +830,11 @@ export const createArkanoidEngine: EngineFactory = (canvas, onState) => {
         rafId = requestAnimationFrame(loop);
       }
       reportState();
+    },
+    setSkin(skin: SkinId) {
+      palette = SKINS[skin] ?? SKINS[DEFAULT_SKIN];
+      // En pausa no hay frames corriendo: redibuja una vez para que se vea.
+      if (rafId === null) draw();
     },
     destroy() {
       if (rafId !== null) cancelAnimationFrame(rafId);
