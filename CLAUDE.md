@@ -12,6 +12,15 @@ Arcade Vault — a platform for playing games online and competing on points/lea
 
 `app/actions/scores.ts` (`saveScore`) rejects any score above a per-game `MAX_PLAUSIBLE_SCORE` before persisting (added by OpenSpec change `11-score-plausibility-caps-v0.2.5`) — a new game's engine needs an entry there too, or every score it reports gets rejected (fail-closed for unconfigured games is intentional).
 
+## Knowledge graph (Graphify)
+
+`graphify-out/` holds a Graphify knowledge graph of the whole repo (code via AST + specs/docs via semantic extraction): `GRAPH_REPORT.md` (god nodes, communities, surprising connections), `graph.json` (full graph), `graph.html` (interactive view). **Use it before reading files one by one** when you need to understand the code — architecture, what calls what, how a spec maps to its implementation, or what a change would affect:
+
+- `graphify-out/` is gitignored (generated, machine-specific), so a fresh clone won't have it. If it's missing, build it: `graphify extract . --code-only` then `graphify cluster-only . --no-label` (code only, local, no LLM), or `/graphify .` for the full graph including specs/docs (uses LLM tokens). Needs the `graphify` CLI (`pipx install "graphifyy[sql]"`).
+- Start from `graphify-out/GRAPH_REPORT.md` for the big picture.
+- Query instead of grepping around: `graphify query "<question>"`, `graphify path "A" "B"`, `graphify explain "X"`, `graphify affected "X"` (or the `/graphify` skill, which answers from the existing graph).
+- The graph can be stale — its report records the commit it was built from. After code changes, refresh with `graphify update .` (code only, no LLM); re-run `/graphify .` when specs/docs change. Always confirm against the actual source before editing.
+
 ## Skills
 
 Usa siempre el /fontend-design para hacer interfaz de usuario.
