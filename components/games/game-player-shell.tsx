@@ -3,8 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { saveScore } from "@/app/actions/scores";
-import { ARENA_HEIGHT, ARENA_WIDTH, type EngineHandle, type EngineState } from "./game-engine";
+import {
+  ARENA_HEIGHT,
+  ARENA_WIDTH,
+  DEFAULT_SKIN,
+  type EngineHandle,
+  type EngineState,
+  type SkinId,
+} from "./game-engine";
 import { GAME_ENGINES } from "./registry";
+import { getSavedSkin, saveSkin, SKIN_LABELS } from "./skins";
 
 type Props = {
   gameId: string;
@@ -31,18 +39,29 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
   const [ready, setReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Arranca en el default para calzar con el render del servidor; la skin
+  // guardada se lee recién en el cliente, al crear el motor (ver nav.tsx,
+  // mismo gotcha de hidratación que el mute).
+  const [skin, setSkin] = useState<SkinId>(DEFAULT_SKIN);
+
+  const skinOptions = GAME_ENGINES[gameId]?.skins;
 
   useEffect(() => {
     let cancelled = false;
     let handle: EngineHandle | null = null;
 
-    const loadEngine = GAME_ENGINES[gameId]?.load;
+    const registration = GAME_ENGINES[gameId];
+    const loadEngine = registration?.load;
     if (!loadEngine) return;
+
+    const savedSkin = getSavedSkin(gameId);
+    const initialSkin = registration.skins?.includes(savedSkin) ? savedSkin : DEFAULT_SKIN;
 
     loadEngine().then((createEngine) => {
       if (cancelled || !canvasRef.current) return;
-      handle = createEngine(canvasRef.current, (next) => setState(next));
+      handle = createEngine(canvasRef.current, (next) => setState(next), { skin: initialSkin });
       engineRef.current = handle;
+      setSkin(initialSkin);
       setReady(true);
       handle.start();
     });
@@ -95,6 +114,14 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     engineRef.current?.restart();
   };
 
+  /** Solo visual: no reinicia la partida ni toca el guardado de score. */
+  const handleSkinChange = (next: SkinId) => {
+    if (next === skin) return;
+    setSkin(next);
+    saveSkin(gameId, next);
+    engineRef.current?.setSkin?.(next);
+  };
+
   const isGameOver = state.phase === "gameover";
 
   return (
@@ -124,6 +151,36 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
               <div className="l">{state.badge.label}</div>
               <div className="v" style={{ color: "var(--cyan)" }}>
                 {state.badge.value}
+              </div>
+            </div>
+          ) : null}
+          {skinOptions && skinOptions.length > 0 ? (
+            <div className="hud-stat">
+              <div className="l" id="skin-label">
+                Skin
+              </div>
+              <div role="group" aria-labelledby="skin-label" style={{ display: "flex", gap: 6 }}>
+                {skinOptions.map((id) => {
+                  const active = id === skin;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={active}
+                      className={active ? "btn" : "btn ghost"}
+                      disabled={!ready}
+                      onClick={() => handleSkinChange(id)}
+                      style={{
+                        padding: "6px 10px",
+                        fontSize: 8,
+                        color: active ? "var(--cyan)" : undefined,
+                        textShadow: active ? "0 0 6px rgba(0,245,255,0.5)" : undefined,
+                      }}
+                    >
+                      {SKIN_LABELS[id]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : null}

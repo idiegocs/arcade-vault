@@ -53,6 +53,56 @@ Con eso, `/juegos/<id>/jugar` usa el motor real automáticamente —
 `game-player-shell.tsx`, el HUD, la pausa, el modal de fin de partida y el
 guardado de puntuación no se tocan.
 
+## Skins
+
+Todo motor debe soportar al menos 3 skins visuales. El agente
+`skin-designer` las implementa juego por juego; **CAÍDA**
+(`caida/tetris-engine.ts`) es la referencia que el resto imita.
+
+| id        | Etiqueta | Qué es                                                                      |
+| --------- | -------- | --------------------------------------------------------------------------- |
+| `clasico` | CLÁSICO  | **Default.** El look original del motor, idéntico.                          |
+| `neon`    | NEÓN     | Synthwave: tubos de neón huecos con glow, fondo violeta, grilla magenta.    |
+| `retro`   | RETRO    | 4–6 tonos (Game Boy / CGA / NES), sin glow ni transparencias, bordes duros. |
+
+### Contrato (plataforma)
+
+- `game-engine.ts`: `REQUIRED_SKINS`, `SkinId`, `DEFAULT_SKIN` (`"clasico"`),
+  `EngineOptions = { skin?: SkinId }`. `EngineFactory` recibe un 3er
+  parámetro opcional `options?: EngineOptions` (un motor sin skins sigue
+  compilando) y `EngineHandle` suma `setSkin?(skin)`, que cambia la skin en
+  vivo sin reiniciar la partida.
+- `skins.ts`: `getSavedSkin(gameId)` / `saveSkin(gameId, skin)` con
+  `localStorage` bajo `av-skin:<gameId>` (valor inválido o ausente →
+  `DEFAULT_SKIN`), y `SKIN_LABELS`.
+- `registry.ts`: `skins?: readonly SkinId[]` en la entrada del juego. Sin
+  `skins`, el reproductor no muestra selector.
+- `game-player-shell.tsx`: selector en el HUD. Lee la skin guardada en el
+  `useEffect` que crea el motor (nunca en el render — hidratación) y la pasa
+  como `createEngine(canvas, onState, { skin })`; al cambiarla llama a
+  `saveSkin` + `engine.setSkin?.(skin)`.
+
+### Receta (por motor)
+
+1. **Paleta tipada**: `type <Juego>Palette = { ... }` con todos los colores
+   que el dibujo usaba como literal (fondo, grilla/bordes, cada entidad,
+   texto del canvas, overlays). Los efectos que no son solo color (glow,
+   contorno, marcas) van como datos en la paleta (`blockGlow: number`,
+   `ghost: { kind: "outline" … }`), no como `if (skin === "neon")`.
+2. **Tabla**: `const SKINS: Record<SkinId, <Juego>Palette>` con las 3.
+   `clasico` copia los colores actuales tal cual.
+3. **Estado**: `let palette = SKINS[options?.skin ?? DEFAULT_SKIN];` al crear
+   el motor; el dibujo siempre lee de `palette`.
+4. **`setSkin`** en el handle: reasigna `palette` y, si no hay frames
+   corriendo (pausa), redibuja una vez.
+5. **Registry**: `skins: ["clasico", "neon", "retro"]` en la entrada.
+
+Reglas: las skins son **solo visuales** — nunca cambian hitboxes, tamaños,
+velocidades, spawn, puntaje, controles ni sonidos. En NEÓN, resetear
+`shadowBlur = 0` después de dibujar lo que brilla. En RETRO, si las
+entidades comparten tono, distinguirlas por patrón o borde (CAÍDA usa
+marcas interiores: punto, cuadro, franja, cruz).
+
 **Nota para motores con controles de puntero:** el canvas se escala por CSS
 a 100% de `.crt-screen`, pero su resolución interna sigue siendo fija
 (`ARENA_WIDTH × ARENA_HEIGHT`). Un motor que use posición de mouse/touch

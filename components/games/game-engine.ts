@@ -13,6 +13,13 @@
 export const ARENA_WIDTH = 800;
 export const ARENA_HEIGHT = 600;
 
+/** Skins que todo motor debe soportar. `clasico` es el default. */
+export const REQUIRED_SKINS = ["clasico", "neon", "retro"] as const;
+export type SkinId = (typeof REQUIRED_SKINS)[number];
+export const DEFAULT_SKIN: SkinId = "clasico";
+
+export type EngineOptions = { skin?: SkinId };
+
 export type EnginePhase = "playing" | "paused" | "gameover";
 
 export type EngineState = {
@@ -34,16 +41,23 @@ export type EngineHandle = {
   restart(): void;
   /** Limpia listeners, timers y el requestAnimationFrame propios del motor. */
   destroy(): void;
+  /** Cambia la skin en vivo, sin reiniciar la partida. Opcional: un motor
+   * sin skins no lo implementa. Solo visual — nunca toca hitboxes,
+   * velocidades, spawn, puntaje, controles ni sonidos. */
+  setSkin?(skin: SkinId): void;
 };
 
 /**
  * Crea una instancia del motor sobre el canvas dado. `onState` debe
  * llamarse solo cuando el valor mostrado realmente cambia (score, lives,
  * level, phase o badge) — nunca en cada frame de requestAnimationFrame.
+ * `options.skin` es la skin inicial (default `DEFAULT_SKIN`); un motor sin
+ * skins puede ignorar el parámetro.
  */
 export type EngineFactory = (
   canvas: HTMLCanvasElement,
-  onState: (state: EngineState) => void
+  onState: (state: EngineState) => void,
+  options?: EngineOptions
 ) => EngineHandle;
 
 /** Carga perezosa de un `EngineFactory` — permite que cada motor viva en su

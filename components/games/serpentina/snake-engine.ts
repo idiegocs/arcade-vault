@@ -23,13 +23,19 @@
  * - El sprite de fruta (`apple`, recorte de `public/fruits.png`) se carga de
  *   forma perezosa/asíncrona; hasta que termina de cargar, la fruta se
  *   dibuja como un placeholder verde.
+ * - Skins visuales (`clasico`/`neon`/`retro`, ver `SKINS`), con el patrón de
+ *   CAÍDA (sección "Skins" de `../README.md`). Todo el dibujo lee de
+ *   `palette`, nunca un literal. Solo visual: grilla, velocidad, colisiones y
+ *   puntaje son idénticos en las 3.
  */
 import {
   ARENA_HEIGHT as H,
   ARENA_WIDTH as W,
+  DEFAULT_SKIN,
   type EngineFactory,
   type EnginePhase,
   type EngineState,
+  type SkinId,
 } from "../game-engine";
 import { beep, defineSounds } from "../audio";
 
@@ -55,6 +61,128 @@ const FRUIT_SRC = "/fruits.png";
 /** Recorte de `apple` en `fruits.png`, portado de
  * `references/source-asset/snake-assets/sprites.js` (`SPRITE_ATLAS.fruits.apple`). */
 const APPLE_SPRITE = { sx: 2786, sy: 136, sw: 110, sh: 160 };
+
+// ── Skins ─────────────────────────────────────────────────────────────
+/** Marca interior de una celda — separa entidades que comparten tono en
+ * paletas reducidas (RETRO). */
+type CellMark = "none" | "dot" | "inset";
+/** Silueta de la celda. `diamond` en sólido se dibuja escalonado (pixel art). */
+type CellShape = "square" | "circle" | "diamond";
+
+type EntityStyle = {
+  fill: string;
+  shape: CellShape;
+  mark: CellMark;
+  markColor: string;
+};
+
+type SnakePalette = {
+  /** Fondo de todo el canvas (el arena entero es el área de juego). */
+  background: string;
+  /** Si existe, el fondo es un degradé vertical `background` → este color. */
+  backgroundBottom: string | null;
+  gridLine: string | null;
+  gridLineWidth: number;
+  /** Marco alrededor del arena (`null` = sin marco). */
+  frame: string | null;
+  frameWidth: number;
+  /** `shadowBlur` del marco (0 = sin glow). */
+  frameGlow: number;
+  head: EntityStyle;
+  body: EntityStyle;
+  /** Ojos de la cabeza. */
+  eye: string;
+  /** Ojos como cuadrados de píxel (bordes duros) en vez de círculos. */
+  eyeSquare: boolean;
+  fruit: EntityStyle;
+  /** Usa el sprite de manzana (`fruits.png`); `fruit` es el placeholder
+   * hasta que carga. Sin sprite, la fruta se dibuja siempre con `fruit`. */
+  fruitSprite: boolean;
+  /** Borde duro alrededor de cada celda (`null` = sin borde). */
+  cellEdge: string | null;
+  cellEdgeWidth: number;
+  /** `shadowBlur` de las entidades; el `shadowColor` es su `fill`. */
+  glow: number;
+  /** Entidades como "tubo de neón": contorno brillante, relleno casi
+   * transparente y núcleo blanco fino (`null` = celda sólida). */
+  tube: { lineWidth: number; fillAlpha: number; core: string } | null;
+};
+
+const entity = (
+  fill: string,
+  shape: CellShape = "square",
+  mark: CellMark = "none",
+  markColor = fill
+): EntityStyle => ({ fill, shape, mark, markColor });
+
+/** Game Boy DMG: los 4 verdes, de más oscuro a más claro. */
+const GB = { darkest: "#0f380f", dark: "#306230", light: "#8bac0f", lightest: "#9bbc0f" };
+
+const SKINS: Record<SkinId, SnakePalette> = {
+  // Look original del motor, copiado tal cual.
+  clasico: {
+    background: "#000",
+    backgroundBottom: null,
+    gridLine: null,
+    gridLineWidth: 0,
+    frame: null,
+    frameWidth: 0,
+    frameGlow: 0,
+    head: entity("#4ade80"),
+    body: entity("#16a34a"),
+    eye: "#052e16",
+    eyeSquare: false,
+    fruit: entity("#22c55e"),
+    fruitSprite: true,
+    cellEdge: null,
+    cellEdgeWidth: 0,
+    glow: 0,
+    tube: null,
+  },
+  // Synthwave: tubos de neón huecos con glow fuerte sobre fondo violeta con
+  // grilla y marco magenta. Cabeza cyan, cuerpo verde, fruta amarilla circular.
+  neon: {
+    background: "#0b0016",
+    backgroundBottom: "#12002a",
+    gridLine: "rgba(255,43,214,0.12)",
+    gridLineWidth: 1,
+    frame: "#ff2bd6",
+    frameWidth: 3,
+    frameGlow: 24,
+    head: entity("#00f5ff"),
+    body: entity("#00ff88"),
+    eye: "#ffffff",
+    eyeSquare: false,
+    fruit: entity("#f5ff00", "circle"),
+    fruitSprite: false,
+    cellEdge: null,
+    cellEdgeWidth: 0,
+    glow: 16,
+    tube: { lineWidth: 3, fillAlpha: 0.14, core: "rgba(255,255,255,0.85)" },
+  },
+  // 4 verdes de Game Boy, bordes duros, sin glow ni alpha. Cabeza lisa en el
+  // tono más oscuro con ojos claros; cuerpo medio con punto claro; fruta como
+  // rombo escalonado oscuro con centro claro — tres siluetas distintas.
+  retro: {
+    background: GB.lightest,
+    backgroundBottom: null,
+    gridLine: GB.light,
+    gridLineWidth: 1,
+    frame: GB.darkest,
+    frameWidth: 4,
+    frameGlow: 0,
+    head: entity(GB.darkest),
+    body: entity(GB.dark, "square", "dot", GB.lightest),
+    eye: GB.lightest,
+    eyeSquare: true,
+    fruit: entity(GB.darkest, "diamond", "dot", GB.lightest),
+    fruitSprite: false,
+    cellEdge: GB.darkest,
+    cellEdgeWidth: 2,
+    glow: 0,
+    tube: null,
+  },
+};
 
 type Dir = { dx: number; dy: number };
 type Cell = { col: number; row: number };
@@ -101,9 +229,12 @@ function loadFruitSprite(cb: () => void): void {
   img.src = FRUIT_SRC;
 }
 
-export const createSnakeEngine: EngineFactory = (canvas, onState) => {
+export const createSnakeEngine: EngineFactory = (canvas, onState, options) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
+
+  /** Paleta activa — solo visual; `setSkin` la reasigna en vivo. */
+  let palette: SnakePalette = SKINS[options?.skin ?? DEFAULT_SKIN] ?? SKINS[DEFAULT_SKIN];
 
   let spriteReady = fruitLoaded;
   if (!spriteReady) {
@@ -291,12 +422,162 @@ export const createSnakeEngine: EngineFactory = (canvas, onState) => {
     reportState();
   }
 
-  function draw() {
-    ctx!.fillStyle = "#000";
+  /** Traza la silueta `shape` dentro del cuadrado `(x, y, s)` como path. */
+  function shapePath(shape: CellShape, x: number, y: number, s: number) {
+    ctx!.beginPath();
+    switch (shape) {
+      case "circle":
+        ctx!.arc(x + s / 2, y + s / 2, s / 2, 0, Math.PI * 2);
+        break;
+      case "diamond":
+        ctx!.moveTo(x + s / 2, y);
+        ctx!.lineTo(x + s, y + s / 2);
+        ctx!.lineTo(x + s / 2, y + s);
+        ctx!.lineTo(x, y + s / 2);
+        ctx!.closePath();
+        break;
+      case "square":
+        ctx!.rect(x, y, s, s);
+        break;
+    }
+  }
+
+  /** Relleno sólido de la silueta. El rombo va escalonado con rectángulos
+   * enteros (bordes duros, sin antialias) — usado por RETRO. */
+  function fillShape(shape: CellShape, x: number, y: number, s: number) {
+    if (shape === "square") {
+      ctx!.fillRect(x, y, s, s);
+      return;
+    }
+    if (shape === "diamond") {
+      const steps = 4;
+      const unit = Math.floor(s / (2 * steps));
+      const off = Math.floor((s - 2 * steps * unit) / 2);
+      const size = 2 * steps * unit;
+      for (let i = 0; i < steps; i++) {
+        const inset = (steps - 1 - i) * unit;
+        ctx!.fillRect(x + off + inset, y + off + i * unit, size - 2 * inset, size - 2 * i * unit);
+      }
+      return;
+    }
+    shapePath(shape, x, y, s);
+    ctx!.fill();
+  }
+
+  /** Marca interior (solo paletas con `mark`, ej. RETRO), bordes duros. */
+  function drawMark(style: EntityStyle, x: number, y: number, s: number) {
+    const half = Math.floor(s / 2);
+    ctx!.fillStyle = style.markColor;
+    switch (style.mark) {
+      case "dot":
+        ctx!.fillRect(x + half - 2, y + half - 2, 4, 4);
+        break;
+      case "inset":
+        ctx!.fillRect(x + 3, y + 3, s - 6, s - 6);
+        ctx!.fillStyle = style.fill;
+        ctx!.fillRect(x + 5, y + 5, s - 10, s - 10);
+        break;
+      case "none":
+        break;
+    }
+  }
+
+  /** Dibuja una entidad en la celda `(col, row)` según la paleta activa:
+   * relleno plano (CLÁSICO), tubo de neón hueco (NEÓN) o sólido con borde
+   * duro y marca (RETRO). `margin` = hueco con el borde de la celda. */
+  function drawEntity(cell: Cell, style: EntityStyle, margin: number) {
+    const x = cell.col * CELL + margin;
+    const y = cell.row * CELL + margin;
+    const s = CELL - 2 * margin;
+
+    const tube = palette.tube;
+    if (tube) {
+      const inset = tube.lineWidth / 2 + 1;
+      ctx!.globalAlpha = tube.fillAlpha;
+      ctx!.fillStyle = style.fill;
+      shapePath(style.shape, x, y, s);
+      ctx!.fill();
+      ctx!.globalAlpha = 1;
+      if (palette.glow > 0) {
+        ctx!.shadowColor = style.fill;
+        ctx!.shadowBlur = palette.glow;
+      }
+      shapePath(style.shape, x + inset, y + inset, s - 2 * inset);
+      ctx!.strokeStyle = style.fill;
+      ctx!.lineWidth = tube.lineWidth;
+      ctx!.stroke();
+      ctx!.shadowBlur = 0;
+      ctx!.strokeStyle = tube.core;
+      ctx!.lineWidth = 1;
+      ctx!.stroke();
+      return;
+    }
+
+    if (palette.glow > 0) {
+      ctx!.shadowColor = style.fill;
+      ctx!.shadowBlur = palette.glow;
+    }
+    const e = palette.cellEdge ? palette.cellEdgeWidth : 0;
+    if (palette.cellEdge) {
+      ctx!.fillStyle = palette.cellEdge;
+      fillShape(style.shape, x, y, s);
+      ctx!.shadowBlur = 0;
+    }
+    ctx!.fillStyle = style.fill;
+    // El rombo escalonado ya es una silueta cerrada: su borde es el propio tono.
+    if (style.shape === "diamond") fillShape(style.shape, x, y, s);
+    else fillShape(style.shape, x + e, y + e, s - 2 * e);
+    ctx!.shadowBlur = 0;
+    if (style.mark !== "none") drawMark(style, x + e, y + e, s - 2 * e);
+  }
+
+  function drawBackground() {
+    if (palette.backgroundBottom) {
+      const gradient = ctx!.createLinearGradient(0, 0, 0, H);
+      gradient.addColorStop(0, palette.background);
+      gradient.addColorStop(1, palette.backgroundBottom);
+      ctx!.fillStyle = gradient;
+    } else {
+      ctx!.fillStyle = palette.background;
+    }
     ctx!.fillRect(0, 0, W, H);
 
+    if (palette.gridLine) {
+      ctx!.strokeStyle = palette.gridLine;
+      ctx!.lineWidth = palette.gridLineWidth;
+      ctx!.beginPath();
+      for (let c = 1; c < COLS; c++) {
+        ctx!.moveTo(c * CELL, 0);
+        ctx!.lineTo(c * CELL, H);
+      }
+      for (let r = 1; r < ROWS; r++) {
+        ctx!.moveTo(0, r * CELL);
+        ctx!.lineTo(W, r * CELL);
+      }
+      ctx!.stroke();
+    }
+  }
+
+  /** Marco del arena, pegado al borde del canvas (se dibuja al final para
+   * que el glow quede por encima de la grilla). */
+  function drawFrame() {
+    if (!palette.frame) return;
+    const w = palette.frameWidth;
+    if (palette.frameGlow > 0) {
+      ctx!.shadowColor = palette.frame;
+      ctx!.shadowBlur = palette.frameGlow;
+    }
+    ctx!.strokeStyle = palette.frame;
+    ctx!.lineWidth = w;
+    ctx!.strokeRect(w / 2, w / 2, W - w, H - w);
+    ctx!.shadowBlur = 0;
+  }
+
+  function draw() {
+    drawBackground();
+
     // Fruta
-    if (spriteReady && fruitImg) {
+    if (palette.fruitSprite && spriteReady && fruitImg) {
       ctx!.drawImage(
         fruitImg,
         APPLE_SPRITE.sx,
@@ -309,18 +590,17 @@ export const createSnakeEngine: EngineFactory = (canvas, onState) => {
         CELL
       );
     } else {
-      ctx!.fillStyle = "#22c55e";
-      ctx!.fillRect(fruit.col * CELL, fruit.row * CELL, CELL, CELL);
+      // CLÁSICO: placeholder a celda completa (margen 0), como el original.
+      drawEntity(fruit, palette.fruit, palette.fruitSprite ? 0 : 1);
     }
 
-    // Serpiente — cabeza más clara que el cuerpo, con ojos para distinguirla
-    // de un vistazo (no hay sprite propio, es dibujo vectorial).
+    // Serpiente — la cabeza se distingue del cuerpo (tono propio + ojos) de
+    // un vistazo en las 3 skins (no hay sprite propio, es dibujo vectorial).
     for (let i = body.length - 1; i >= 0; i--) {
-      const seg = body[i];
-      ctx!.fillStyle = i === 0 ? "#4ade80" : "#16a34a";
-      ctx!.fillRect(seg.col * CELL + 1, seg.row * CELL + 1, CELL - 2, CELL - 2);
+      drawEntity(body[i], i === 0 ? palette.head : palette.body, 1);
     }
     drawEyes();
+    drawFrame();
   }
 
   /** Dos puntos oscuros sobre la cabeza, desplazados hacia `dir` y separados
@@ -337,7 +617,11 @@ export const createSnakeEngine: EngineFactory = (canvas, onState) => {
     for (const side of [-1, 1]) {
       const ex = cx + dir.dx * forward + perpX * spread * side;
       const ey = cy + dir.dy * forward + perpY * spread * side;
-      ctx!.fillStyle = "#052e16";
+      ctx!.fillStyle = palette.eye;
+      if (palette.eyeSquare) {
+        ctx!.fillRect(Math.round(ex) - 2, Math.round(ey) - 2, 4, 4);
+        continue;
+      }
       ctx!.beginPath();
       ctx!.arc(ex, ey, eyeRadius, 0, Math.PI * 2);
       ctx!.fill();
@@ -400,6 +684,11 @@ export const createSnakeEngine: EngineFactory = (canvas, onState) => {
         rafId = requestAnimationFrame(loop);
       }
       reportState();
+    },
+    setSkin(skin: SkinId) {
+      palette = SKINS[skin] ?? SKINS[DEFAULT_SKIN];
+      // En pausa no hay frames corriendo: redibuja una vez para que se vea.
+      if (rafId === null) draw();
     },
     destroy() {
       if (rafId !== null) cancelAnimationFrame(rafId);
