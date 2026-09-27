@@ -25,7 +25,17 @@ import {
   type EnginePhase,
   type EngineState,
 } from "../game-engine";
-import { playSound } from "../audio";
+import { beep, defineSounds } from "../audio";
+
+/** Sonidos de este juego (ver `defineSounds` en `../audio`). */
+const playSound = defineSounds({
+  bounce: () => beep(600, 0.05, "square", 0.1),
+  brick: () => beep(340, 0.07, "square", 0.15),
+  lifeLost: () => {
+    beep(300, 0.15, "sawtooth", 0.18);
+    beep(180, 0.2, "sawtooth", 0.15);
+  },
+});
 
 const SPRITESHEET_SRC = "/spritesheet-breakout.png";
 

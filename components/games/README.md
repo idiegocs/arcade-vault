@@ -23,15 +23,31 @@ automatizan, para cuando necesites entender o revisar lo que hicieron.
    `phase` o `badge` — no en cada frame de `requestAnimationFrame`), y su
    `destroy()` limpia todos sus propios listeners/timers/RAF (el shell no
    sabe nada de los internals del motor).
-3. Agrega una línea en `components/games/registry.ts` usando `import()`
-   dinámico, no un import estático arriba del archivo:
+3. Si el juego tiene sonido, declara sus presets dentro del propio motor con
+   `defineSounds` (de `./audio`), combinando `beep(...)` — `audio.ts` solo
+   tiene la infraestructura compartida (contexto, mute, `beep`) y no se toca:
 
    ```ts
-   <id>: () => import("./<id>/<archivo-del-motor>").then((m) => m.create<Nombre>Engine),
+   const playSound = defineSounds({ jump: () => beep(660, 0.08, "square", 0.12) });
+   ```
+
+4. Agrega la entrada del juego en `components/games/registry.ts`, con el
+   motor cargado por `import()` dinámico (no un import estático arriba del
+   archivo) y su techo de puntuación plausible:
+
+   ```ts
+   <id>: {
+     load: () => import("./<id>/<archivo-del-motor>").then((m) => m.create<Nombre>Engine),
+     maxPlausibleScore: <techo>,
+   },
    ```
 
    Así el motor de ese juego solo se descarga (su propio chunk de JS) cuando
    alguien entra a `/juegos/<id>/jugar` — visitar otros juegos no lo carga.
+   `maxPlausibleScore` es el máximo que `saveScore` acepta en el servidor
+   (exacto si el juego tiene un final enumerable, "techo de cordura" si es
+   sin fin — ver spec `11-score-plausibility-caps-v0.2.5`); sin entrada en
+   el registro, toda puntuación del juego se rechaza (fail closed).
 
 Con eso, `/juegos/<id>/jugar` usa el motor real automáticamente —
 `game-player-shell.tsx`, el HUD, la pausa, el modal de fin de partida y el

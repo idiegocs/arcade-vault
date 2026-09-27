@@ -15,7 +15,7 @@ cada vez que se agregue o elimine un juego** — ver la regla en `CLAUDE.md`.
 | `ranaria`      | RANARIA      | ARCADE    | ❌ sin motor — mock estático                                        | —    |
 | `duelo-pixel`  | DUELO PIXEL  | VERSUS    | ❌ sin motor — mock estático                                        | —    |
 
-Un juego con motor real también necesita una entrada en
-`MAX_PLAUSIBLE_SCORE` (`app/actions/scores.ts`) — sin eso, `saveScore`
-rechaza cualquier puntuación suya (fail-closed intencional, ver spec
-`11-score-plausibility-caps-v0.2.5`).
+Cada entrada de `components/games/registry.ts` declara también el
+`maxPlausibleScore` del juego — `saveScore` (`app/actions/scores.ts`) lo lee
+de ahí y rechaza cualquier puntuación de un juego sin registro (fail-closed
+intencional, ver spec `11-score-plausibility-caps-v0.2.5`).

@@ -49,3 +49,6 @@ references/apk.txt
 
 # claude code
 .claude/
+
+# graphify knowledge graph (local)
+graphify-out/

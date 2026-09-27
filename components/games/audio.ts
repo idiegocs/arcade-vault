@@ -4,6 +4,10 @@
  * externas. Cualquier motor la importa directamente; no forma parte del
  * contrato de `EngineFactory`/`EngineHandle` (ver `game-engine.ts`, que no
  * se toca en este archivo ni en el shell).
+ *
+ * Este archivo solo tiene la infraestructura compartida (contexto, mute,
+ * `beep`). Los sonidos concretos de cada juego viven en su propio motor,
+ * declarados con `defineSounds` — agregar un juego no toca este archivo.
  */
 
 const MUTE_KEY = "arcade-vault:muted";
@@ -54,7 +58,12 @@ export function toggleMuted(): boolean {
  * instantáneo, caída exponencial). No hace nada si está muteado o si Web
  * Audio no está disponible (SSR, navegadores sin soporte).
  */
-function beep(freq: number, duration: number, type: OscillatorType = "square", gain = 0.15): void {
+export function beep(
+  freq: number,
+  duration: number,
+  type: OscillatorType = "square",
+  gain = 0.15
+): void {
   if (muted) return;
   const audioCtx = getContext();
   if (!audioCtx) return;
@@ -74,57 +83,16 @@ function beep(freq: number, duration: number, type: OscillatorType = "square", g
   osc.stop(audioCtx.currentTime + duration);
 }
 
-export type SoundName =
-  | "shoot"
-  | "impact"
-  | "explosion"
-  | "powerup" // rocas
-  | "rotate"
-  | "drop"
-  | "lineClear"
-  | "topout" // caida
-  | "bounce"
-  | "brick"
-  | "lifeLost" // bloque-buster
-  | "eat"
-  | "crash"
-  | "step"; // serpentina
-
-/** Reproduce el sonido `name`. Los presets concretos se agregan a
- * continuación de este archivo, cada uno como una entrada de `SOUNDS`. */
-export function playSound(name: SoundName): void {
-  SOUNDS[name]();
+/**
+ * Declara el set de sonidos de un motor y devuelve su `playSound`, tipado
+ * con los nombres de ese set. Cada motor define sus presets (combinaciones
+ * de `beep`) en su propio archivo:
+ *
+ *   const playSound = defineSounds({ jump: () => beep(660, 0.08) });
+ *   playSound("jump");
+ */
+export function defineSounds<Name extends string>(
+  presets: Record<Name, () => void>
+): (name: Name) => void {
+  return (name) => presets[name]();
 }
-
-const SOUNDS: Record<SoundName, () => void> = {
-  shoot: () => beep(880, 0.08, "square", 0.12),
-  impact: () => beep(220, 0.1, "square", 0.15),
-  explosion: () => {
-    beep(120, 0.35, "sawtooth", 0.2);
-    beep(60, 0.35, "square", 0.15);
-  },
-  powerup: () => {
-    beep(660, 0.08, "triangle", 0.15);
-    beep(990, 0.12, "triangle", 0.15);
-  },
-  rotate: () => beep(520, 0.05, "square", 0.1),
-  drop: () => beep(180, 0.08, "square", 0.15),
-  lineClear: () => {
-    beep(440, 0.09, "triangle", 0.15);
-    beep(660, 0.09, "triangle", 0.15);
-    beep(880, 0.14, "triangle", 0.15);
-  },
-  topout: () => beep(140, 0.4, "sawtooth", 0.2),
-  bounce: () => beep(600, 0.05, "square", 0.1),
-  brick: () => beep(340, 0.07, "square", 0.15),
-  lifeLost: () => {
-    beep(300, 0.15, "sawtooth", 0.18);
-    beep(180, 0.2, "sawtooth", 0.15);
-  },
-  eat: () => beep(740, 0.07, "triangle", 0.15),
-  crash: () => {
-    beep(200, 0.2, "sawtooth", 0.18);
-    beep(100, 0.25, "square", 0.15);
-  },
-  step: () => beep(220, 0.02, "square", 0.03),
-};

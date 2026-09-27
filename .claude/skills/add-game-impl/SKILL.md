@@ -126,8 +126,9 @@ que cualquier score se pueda guardar (FK `scores_game_id_fkey`):
 4. Mecánica del juego, en los pasos que haga falta según el spec (cada uno
    ≤ 30-50 líneas). Cada paso deja el motor jugable hasta donde llegó, aunque
    todavía no esté conectado al registry.
-5. Línea en `components/games/registry.ts` — `import()` dinámico, nunca un
-   import estático arriba del archivo. Test manual: entrar a
+5. Entrada en `components/games/registry.ts` — `load` con `import()`
+   dinámico (nunca un import estático arriba del archivo) y
+   `maxPlausibleScore` con el techo que fija el spec. Test manual: entrar a
    `/juegos/<id>/jugar` y confirmar que aparece el motor real (no el mock
    hardcodeado de score `12450`).
 6. Bump de `package.json` + entrada en `CHANGELOG.md` (Keep a Changelog,
