@@ -49,9 +49,48 @@ automatizan, para cuando necesites entender o revisar lo que hicieron.
    sin fin — ver spec `11-score-plausibility-caps-v0.2.5`); sin entrada en
    el registro, toda puntuación del juego se rechaza (fail closed).
 
+5. Declara sus controles táctiles en la misma entrada (`touchControls`, ver
+   la sección "Controles táctiles" abajo); sin eso, en el celular el juego
+   no muestra gamepad y no se puede jugar.
+
 Con eso, `/juegos/<id>/jugar` usa el motor real automáticamente —
 `game-player-shell.tsx`, el HUD, la pausa, el modal de fin de partida y el
 guardado de puntuación no se tocan.
+
+## Controles táctiles
+
+En dispositivos táctiles (`(pointer: coarse)`), el reproductor muestra un
+gamepad virtual (`touch-gamepad.tsx`) debajo del canvas (en vertical) o a
+sus costados (en horizontal). No sabe nada del motor: cada botón emite
+`KeyboardEvent` sintéticos (`keydown`/`keyup`) sobre `window` con el `code`
+de la tecla que el motor ya escucha. Ver spec
+`12-controles-tactiles-movil-v0.4.0`.
+
+```ts
+touchControls: {
+  dpad: {
+    up: { code: "ArrowUp", label: "▲" },
+    left: { code: "ArrowLeft", label: "◀", repeat: true },
+    right: { code: "ArrowRight", label: "▶", repeat: true },
+    // un slot ausente (aquí `down`) se dibuja igual, pero apagado
+  },
+  actions: [
+    { code: "ArrowUp", label: "GIRAR" },
+    { code: "Space", label: "CAER" },
+  ],
+},
+```
+
+- **Cruceta**: siempre muestra ▲▼◀▶; las direcciones que el juego no declara
+  se ven deshabilitadas. **Acciones**: botones redondos a la derecha (el
+  `label` va en la placa debajo); con 2 o menos se ven mejor.
+- **`repeat: true`** solo si el motor mueve "un paso por `keydown`" y se
+  apoya en el auto-repeat nativo del teclado al mantener la tecla (CAÍDA).
+  Un motor que lee teclas mantenidas por polling (`keys[code]` en cada
+  frame, como ROCAS o BLOQUE BUSTER) no lo necesita.
+- **Requisitos del motor** para que el gamepad funcione: escuchar
+  `keydown`/`keyup` en `window`, comparar `e.code` (no `e.key`) y no filtrar
+  `e.isTrusted`.
 
 ## Skins
 

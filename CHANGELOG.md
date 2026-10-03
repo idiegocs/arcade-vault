@@ -6,6 +6,27 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.4.0] - 2026-10-03
+
+Spec: [`12-controles-tactiles-movil-v0.4.0`](specs/12-controles-tactiles-movil-v0.4.0.md)
+
+### Added
+
+- Gamepad virtual para jugar en celulares y tablets: los 4 juegos con motor (CAÍDA, ROCAS, BLOQUE BUSTER, SERPENTINA) se pueden jugar con pantalla táctil. El gamepad tiene una cruceta (siempre ▲▼◀▶; las direcciones que el juego no usa se ven apagadas) y botones de acción de arcade. Cada botón emite la misma tecla que ya entiende el motor, así que ningún motor cambió. Soporta multitouch y repetición al mantener (CAÍDA). Solo aparece en dispositivos táctiles.
+- En horizontal, "modo juego": el reproductor ocupa toda la pantalla, con la cruceta a la izquierda del canvas y las acciones a la derecha.
+- Botón de pantalla completa en el reproductor (oculto en navegadores que no lo soportan, como iPhone Safari).
+- Pausa automática al cambiar de pestaña o app, o al bloquear el celular. Al volver, el juego queda en pausa hasta tocar REANUDAR.
+- Vibración al perder una vida y en game over (Android; en iOS no hace nada).
+- Campo `touchControls` en `components/games/registry.ts` para declarar el gamepad de cada juego.
+
+### Changed
+
+- En táctil, el HUD del reproductor se compacta: el skin es un desplegable y PAUSA/FIN/SALIR son íconos.
+- En celulares (≤520px), el nav muestra solo el logo y el menú (♪ e Iniciar sesión siguen dentro del menú). Antes desbordaba la pantalla.
+- Durante la partida, Espacio y las flechas ya no hacen scroll de la página ni activan el botón del HUD con foco.
+- Rendimiento: el fondo animado del sitio se apaga mientras el reproductor tapa toda la pantalla, y las scanlines del CRT ya no usan `mix-blend-mode`.
+- `next.config.ts`: `allowedDevOrigins` para poder abrir el dev server desde un celular en la red local.
+
 ## [0.3.0] - 2026-09-27
 
 Sin spec: implementado con el agente `@skin-designer` (`.claude/agents/skin-designer.md`),
