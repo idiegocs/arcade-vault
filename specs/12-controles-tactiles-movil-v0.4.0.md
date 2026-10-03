@@ -1,6 +1,6 @@
 # SPEC 12 — Controles táctiles para jugar en el celular
 
-> **Estado:** Aprobado/
+> **Estado:** Implementado
 > **Depende de:** 05-rocas-asteroids-motor (contrato motor/shell), 07-caida-tetris-motor-v0.2.1, 09-bloque-buster-arkanoid-motor-v0.2.3, 10-serpentina-snake-motor-v0.2.4, v0.3.0 (skins: campo `skins` en `registry.ts`)
 > **Fecha:** 2026-10-03
 > **Versión:** 0.3.0 → 0.4.0 (minor — funcionalidad nueva visible al usuario: los juegos pasan a ser jugables en pantallas táctiles)
