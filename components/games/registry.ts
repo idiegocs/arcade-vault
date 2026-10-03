@@ -40,6 +40,7 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
     load: () => import("./rocas/asteroids-engine").then((m) => m.createAsteroidsEngine),
     maxPlausibleScore: 1_000_000,
     skins: ["clasico", "neon", "retro"],
+    music: "orbita",
     touchControls: {
       dpad: {
         up: { code: "ArrowUp", label: "▲" },
@@ -73,6 +74,7 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
     load: () => import("./bloque-buster/arkanoid-engine").then((m) => m.createArkanoidEngine),
     maxPlausibleScore: 2080,
     skins: ["clasico", "neon", "retro"],
+    music: "turbo",
     touchControls: {
       dpad: {
         left: { code: "ArrowLeft", label: "◀" },
@@ -84,6 +86,7 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
     load: () => import("./serpentina/snake-engine").then((m) => m.createSnakeEngine),
     maxPlausibleScore: 100_000,
     skins: ["clasico", "neon", "retro"],
+    music: "jardin",
     touchControls: {
       dpad: {
         up: { code: "ArrowUp", label: "▲" },

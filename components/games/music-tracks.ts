@@ -116,8 +116,153 @@ const BLOQUES: MusicTrack = {
   ],
 };
 
-/** Pistas compuestas hasta ahora. Las de `TRACK_IDS` que faltan se suman en
- * el paso 3 del spec 13. */
-export const MUSIC_TRACKS: Partial<Record<TrackId, MusicTrack>> = {
+/** Arpegio de un compás en corcheas: sube por los 4 tonos y vuelve. */
+function arp(a: string, b: string, c: string, d: string): string {
+  return `${a} .5 ${b} .5 ${c} .5 ${d} .5 ${c} .5 ${b} .5 ${a} .5 ${b} .5`;
+}
+
+/** Bajo "bombeando" un compás en corcheas: fundamental con un golpe de octava. */
+function pump(...roots: string[]): string {
+  return roots
+    .map((root) => {
+      const up = root.replace(/\d$/, (d) => String(Number(d) + 1));
+      return `${root} .5 ${root} .5 ${up} .5 ${root} .5 `.repeat(2);
+    })
+    .join(" | ");
+}
+
+const ORBITA: MusicTrack = {
+  id: "orbita",
+  label: "ÓRBITA",
+  bpm: 96,
+  voices: [
+    {
+      wave: "triangle",
+      gain: 0.55,
+      // Mi menor, melodía lenta flotando sobre los arpegios.
+      notes: seq(`
+        B4 2 G4 2 | E5 4 | F#5 2 E5 1 D5 1 | F#5 4 |
+        B4 2 G4 2 | E5 2 G5 2 | F#5 3 A5 1 | F#5 4 |
+        E5 2 C5 2 | G5 4 | E5 2 G5 2 | F#5 2 D#5 2 |
+        E5 2 B4 2 | G5 2 E5 2 | F#5 2 A5 1 F#5 1 | E5 4
+      `),
+    },
+    {
+      wave: "triangle",
+      gain: 0.3,
+      notes: seq(
+        [
+          arp("E4", "G4", "B4", "E5"),
+          arp("C4", "E4", "G4", "C5"),
+          arp("D4", "F#4", "A4", "D5"),
+          arp("B3", "D4", "F#4", "B4"),
+          arp("E4", "G4", "B4", "E5"),
+          arp("C4", "E4", "G4", "C5"),
+          arp("D4", "F#4", "A4", "D5"),
+          arp("D4", "F#4", "A4", "D5"),
+          arp("A3", "C4", "E4", "A4"),
+          arp("C4", "E4", "G4", "C5"),
+          arp("E4", "G4", "B4", "E5"),
+          arp("B3", "D#4", "F#4", "B4"),
+          arp("E4", "G4", "B4", "E5"),
+          arp("C4", "E4", "G4", "C5"),
+          arp("D4", "F#4", "A4", "D5"),
+          arp("E4", "G4", "B4", "E5"),
+        ].join(" | ")
+      ),
+    },
+    {
+      wave: "sine",
+      gain: 0.6,
+      notes: seq(`
+        E2 4 | C2 4 | D2 4 | B1 4 | E2 4 | C2 4 | D2 4 | D2 4 |
+        A1 4 | C2 4 | E2 4 | B1 4 | E2 4 | C2 4 | D2 4 | E2 4
+      `),
+    },
+  ],
+};
+
+const TURBO: MusicTrack = {
+  id: "turbo",
+  label: "TURBO",
+  bpm: 160,
+  voices: [
+    {
+      wave: "square",
+      gain: 0.3,
+      // Re menor, melodía rápida con semicorcheas y cierre en La (dominante)
+      // para que el bucle vuelva con fuerza al inicio.
+      notes: seq(`
+        D5 .5 F5 .5 A5 .5 F5 .5 D5 .5 F5 .5 A5 .5 C6 .5 | A5 1 G5 .5 F5 .5 E5 .5 F5 .5 G5 1 |
+        F5 .5 D5 .5 Bb4 .5 D5 .5 F5 1 Bb5 1 | A5 .5 G5 .5 E5 .5 C5 .5 E5 .5 G5 .5 C6 1 |
+        D5 .5 F5 .5 A5 .5 F5 .5 D5 .5 F5 .5 A5 .5 C6 .5 | A5 .5 C6 .5 A5 .5 F5 .5 D5 1 F5 1 |
+        D5 .5 F5 .5 Bb5 .5 A5 .5 G5 .5 F5 .5 D5 1 | C#5 .5 E5 .5 A5 .5 G5 .5 E5 .5 C#5 .5 A4 1 |
+        G5 .25 A5 .25 G5 .25 F5 .25 D5 1 Bb4 .5 D5 .5 G5 1 | G5 .5 A5 .5 Bb5 1 A5 .5 G5 .5 F5 1 |
+        F5 .25 G5 .25 F5 .25 E5 .25 D5 1 A4 .5 D5 .5 F5 1 | A5 2 - 1 A5 .5 C6 .5 |
+        Bb5 .5 A5 .5 G5 .5 F5 .5 D5 1 Bb4 1 | C5 .5 E5 .5 G5 .5 C6 .5 Bb5 .5 A5 .5 G5 1 |
+        A5 .5 F5 .5 D5 .5 F5 .5 A5 1 D6 1 | C#6 1 A5 .5 E5 .5 C#5 1 - 1
+      `),
+    },
+    {
+      wave: "triangle",
+      gain: 0.85,
+      notes: seq(
+        pump(
+          "D2",
+          "D2",
+          "Bb1",
+          "C2",
+          "D2",
+          "D2",
+          "Bb1",
+          "A1",
+          "G1",
+          "G1",
+          "D2",
+          "D2",
+          "Bb1",
+          "C2",
+          "D2",
+          "A1"
+        )
+      ),
+    },
+  ],
+};
+
+const JARDIN: MusicTrack = {
+  id: "jardin",
+  label: "JARDÍN",
+  bpm: 110,
+  voices: [
+    {
+      wave: "triangle",
+      gain: 0.55,
+      // Sol mayor, notas largas y respiraciones: para jugar tranquilo.
+      notes: seq(`
+        B4 2 D5 1 G5 1 | F#5 3 E5 1 | E5 2 G5 1 E5 1 | C5 4 |
+        B4 1 C5 1 D5 2 | A4 2 F#4 2 | G4 1 A4 1 C5 1 E5 1 | D5 4 |
+        E5 2 B4 2 | C5 2 E5 1 G5 1 | D5 2 B4 1 G4 1 | A4 3 - 1 |
+        C5 1 E5 1 G5 2 | F#5 1 E5 1 D5 1 A5 1 | G5 4 | - 2 D5 2
+      `),
+    },
+    {
+      wave: "triangle",
+      gain: 0.7,
+      // Fundamental y quinta en blancas.
+      notes: seq(`
+        G2 2 D3 2 | D2 2 A2 2 | E2 2 B2 2 | C2 2 G2 2 |
+        G2 2 D3 2 | D2 2 A2 2 | C2 2 G2 2 | D2 2 A2 2 |
+        E2 2 B2 2 | C2 2 G2 2 | G2 2 D3 2 | D2 2 A2 2 |
+        C2 2 G2 2 | D2 2 A2 2 | G2 2 D3 2 | G2 2 D3 2
+      `),
+    },
+  ],
+};
+
+export const MUSIC_TRACKS: Record<TrackId, MusicTrack> = {
   bloques: BLOQUES,
+  orbita: ORBITA,
+  turbo: TURBO,
+  jardin: JARDIN,
 };
