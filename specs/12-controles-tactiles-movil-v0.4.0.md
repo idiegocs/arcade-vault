@@ -55,7 +55,8 @@ export type TouchButton = {
 };
 
 export type TouchControls = {
-  /** Cruceta (grupo izquierdo). Un slot ausente no se dibuja. */
+  /** Cruceta (grupo izquierdo). Siempre se dibuja completa (▲▼◀▶); un slot
+   * ausente se muestra deshabilitado. */
   dpad: Partial<Record<DpadSlot, TouchButton>>;
   /** Botones de acción (grupo derecho), en orden de izquierda a derecha. */
   actions?: TouchButton[];
@@ -79,9 +80,11 @@ export type GameRegistration = {
 | Juego         | Cruceta                                                                           | Acciones                       |
 | ------------- | --------------------------------------------------------------------------------- | ------------------------------ |
 | CAÍDA         | `left` ArrowLeft (repeat), `right` ArrowRight (repeat), `down` ArrowDown (repeat) | `GIRAR` ArrowUp, `CAER` Space  |
-| ROCAS         | `left` ArrowLeft, `right` ArrowRight                                              | `MOTOR` ArrowUp, `FUEGO` Space |
+| ROCAS         | `up` ArrowUp (= MOTOR), `left` ArrowLeft, `right` ArrowRight                      | `MOTOR` ArrowUp, `FUEGO` Space |
 | BLOQUE BUSTER | `left` ArrowLeft, `right` ArrowRight                                              | —                              |
 | SERPENTINA    | `up` ArrowUp, `down` ArrowDown, `left` ArrowLeft, `right` ArrowRight              | —                              |
+
+La cruceta siempre muestra las 4 direcciones, para que el gamepad tenga la misma forma en todos los juegos. Un slot que el juego no declara se dibuja apagado y deshabilitado (`disabled`): no emite teclas. Por ejemplo, ▲ en CAÍDA y BLOQUE BUSTER, o ▼ en ROCAS y BLOQUE BUSTER. En ROCAS, ▲ y MOTOR emiten la misma tecla (`ArrowUp`): el jugador elige con qué mano acelera.
 
 Solo CAÍDA usa `repeat`. ROCAS y BLOQUE BUSTER leen las teclas mantenidas por polling (`keys[code]`) en cada frame, y SERPENTINA solo necesita un `keydown` por cambio de dirección.
 
@@ -122,17 +125,29 @@ Convenciones:
 
 ## Plan de implementación
 
+Cada paso termina con algo que se puede abrir en la app y verificar. Los pasos 2–5 se prueban en el navegador del PC con DevTools en modo dispositivo (`Ctrl+Shift+M`); los pasos 6–7 necesitan un Android real.
+
 1. **`next.config.ts`:** commitear `allowedDevOrigins: ["192.168.*.*"]` (ya aplicado). Prueba manual: con `npm run dev`, abrir `http://<IP-LAN>:3000/juegos/serpentina/jugar` desde el celular y ver que el juego pasa de "CARGANDO…" a jugable con teclado bluetooth o, al menos, que el canvas dibuja.
-2. **Tipos y datos:** crear `components/games/touch-gamepad.tsx` solo con los tipos `DpadSlot`, `TouchButton` y `TouchControls`. Agregar `touchControls?: TouchControls` a `GameRegistration` y declarar el mapeo de los 4 juegos en `registry.ts` según la tabla del Modelo de datos. Sin cambios visibles: `npm run build` compila.
-3. **Componente `TouchGamepad` sin repetición:** en el mismo archivo, componente cliente que recibe `controls: TouchControls`. Dibuja la cruceta (grupo izquierdo) y las acciones (grupo derecho). Por botón: `pointerdown` → `setPointerCapture` + `window.dispatchEvent(new KeyboardEvent("keydown", { code }))`; `pointerup`/`pointercancel`/`lostpointercapture` → `keyup`. Al desmontar emite `keyup` de los botones que sigan apretados. Todavía no se monta en ningún lado.
-4. **Repetición:** agregar a `TouchGamepad` el soporte de `repeat` con `REPEAT_DELAY_MS`/`REPEAT_INTERVAL_MS` y limpiar los timers en `keyup` y al desmontar.
-5. **Montaje en el shell, layout vertical:** en `game-player-shell.tsx`, estado `isTouch` con `matchMedia("(pointer: coarse)")` (arranca en `false`, listener de `change`). Si `isTouch && GAME_ENGINES[gameId]?.touchControls`, se dibuja `<TouchGamepad>` debajo del `.crt`. En `app/globals.css`: estilos del gamepad (diseñados con `/frontend-design`, coherentes con la estética CRT/neón), `touch-action: none` y `user-select: none` en `.crt` y en el gamepad, y `-webkit-touch-callout: none`. Prueba manual: Chrome DevTools en modo dispositivo (iPhone/Pixel) → los 4 juegos se pueden jugar en vertical, y en desktop sin emulación el gamepad no aparece.
-6. **Layout horizontal:** con `@media (pointer: coarse) and (orientation: landscape)`, la cruceta queda a la izquierda del canvas y las acciones a la derecha. El canvas toma la altura disponible manteniendo 4:3. Prueba manual: girar el dispositivo emulado → los controles pasan a los costados sin scroll de página.
-7. **Pausa automática:** en el shell, listener de `visibilitychange`: si `document.hidden && state.phase === "playing"` llama a `engineRef.current.pause()`. `TouchGamepad` también escucha `visibilitychange` y suelta las teclas apretadas. Prueba manual: cambiar de pestaña a mitad de partida → al volver aparece EN PAUSA. Funciona igual en desktop.
-8. **Pantalla completa:** botón PANTALLA COMPLETA / SALIR DE PANTALLA COMPLETA en `.hud-actions`, solo si `document.fullscreenEnabled`. Llama a `requestFullscreen()` sobre `.av-player` o a `document.exitFullscreen()`, y sigue `fullscreenchange` en `isFullscreen`. Prueba manual: en Chrome Android entra y sale de pantalla completa; en iPhone Safari el botón no aparece.
-9. **Vibración:** en el shell, `prevLivesRef`. Si `state.lives` baja → `navigator.vibrate?.(150)`; al pasar a `gameover` → `navigator.vibrate?.([100, 60, 100, 60, 300])`. Prueba manual: en un Android, perder una vida vibra y el game over vibra con un patrón más largo.
-10. **Documentación:** en `components/games/README.md`, describir `touchControls` en la receta para agregar un juego (qué códigos usar, cuándo poner `repeat`).
-11. **Versión:** `package.json` `0.3.0` → `0.4.0` y entrada `0.4.0` en `CHANGELOG.md` (Added/Changed) enlazando a este spec.
+
+2. **Gamepad visible y funcional en vertical:**
+   - Crear `components/games/touch-gamepad.tsx` con los tipos `DpadSlot`, `TouchButton` y `TouchControls`.
+   - Agregar `touchControls?: TouchControls` a `GameRegistration` y declarar el mapeo de los 4 juegos en `registry.ts` según la tabla del Modelo de datos.
+   - En el mismo archivo, el componente cliente `TouchGamepad` (sin repetición todavía). Recibe `controls: TouchControls` y dibuja la cruceta (grupo izquierdo) y las acciones (grupo derecho). Por botón: `pointerdown` → `setPointerCapture` + `window.dispatchEvent(new KeyboardEvent("keydown", { code }))`; `pointerup`/`pointercancel`/`lostpointercapture` → `keyup`. Al desmontar emite `keyup` de los botones que sigan apretados.
+   - En `game-player-shell.tsx`, estado `isTouch` con `matchMedia("(pointer: coarse)")` (arranca en `false`, listener de `change`). Si `isTouch && GAME_ENGINES[gameId]?.touchControls`, dibuja `<TouchGamepad>` debajo del `.crt`.
+   - En `app/globals.css`, los estilos del gamepad (diseñados con `/frontend-design`, coherentes con la estética CRT/neón), más `touch-action: none`, `user-select: none` y `-webkit-touch-callout: none` en `.crt` y en el gamepad.
+
+   Prueba manual: en DevTools modo dispositivo (iPhone/Pixel) aparece el gamepad. ROCAS, BLOQUE BUSTER y SERPENTINA se pueden jugar, y CAÍDA responde toque a toque. En desktop sin emulación el gamepad no aparece.
+3. **Repetición:** agregar a `TouchGamepad` el soporte de `repeat` con `REPEAT_DELAY_MS`/`REPEAT_INTERVAL_MS`, y limpiar los timers en `keyup` y al desmontar. Prueba manual: en CAÍDA, mantener ◀ o ▼ mueve la pieza de forma continua.
+4. **Layout horizontal:** con `@media (pointer: coarse) and (orientation: landscape)`, la cruceta queda a la izquierda del canvas y las acciones a la derecha. El canvas toma la altura disponible (`100dvh`) manteniendo 4:3. Prueba manual: girar el dispositivo emulado → los controles pasan a los costados sin scroll de página.
+5. **Pausa automática:** en el shell, listener de `visibilitychange`: si `document.hidden && state.phase === "playing"`, llama a `engineRef.current.pause()`. `TouchGamepad` también escucha `visibilitychange` y suelta las teclas apretadas. Prueba manual: cambiar de pestaña a mitad de partida → al volver aparece EN PAUSA. Funciona igual en desktop.
+6. **Pantalla completa:** botón PANTALLA COMPLETA / SALIR DE PANTALLA COMPLETA en `.hud-actions`, solo si `document.fullscreenEnabled`. Llama a `requestFullscreen()` sobre `.av-player` o a `document.exitFullscreen()`, y sigue `fullscreenchange` en `isFullscreen`. Prueba manual: en Chrome de escritorio y de Android entra y sale de pantalla completa. En iPhone Safari el botón no aparece.
+7. **Vibración:** en el shell, `prevLivesRef`. Si `state.lives` baja → `navigator.vibrate?.(150)`; al pasar a `gameover` → `navigator.vibrate?.([100, 60, 100, 60, 300])`. Prueba manual: en un Android, perder una vida vibra y el game over vibra con un patrón más largo.
+8. **Documentación y versión:**
+   - En `components/games/README.md`, describir `touchControls` en la receta para agregar un juego (qué códigos usar, cuándo poner `repeat`, que el motor lea `e.code` y no filtre `isTrusted`).
+   - `package.json` pasa de `0.3.0` a `0.4.0`.
+   - Agregar la entrada `0.4.0` en `CHANGELOG.md` (Added/Changed) enlazando a este spec.
+
+   Prueba manual: el Footer muestra `v0.4.0`.
 
 ## Criterios de aceptación
 
@@ -142,6 +157,7 @@ Convenciones:
 - [ ] En un dispositivo táctil (`pointer: coarse`) el gamepad aparece en los 4 juegos con motor.
 - [ ] En desktop con mouse el gamepad no aparece y el reproductor se ve igual que en v0.3.0.
 - [ ] En un juego sin motor (ej. `/juegos/gloton/jugar`) no aparece el gamepad.
+- [ ] La cruceta muestra siempre ▲▼◀▶ en los 4 juegos. Las direcciones que el juego no usa se ven apagadas y tocarlas no emite ninguna tecla.
 - [ ] La consola no muestra errores de hidratación al cargar el reproductor en móvil ni en desktop.
 
 **Controles por juego**
@@ -183,6 +199,8 @@ Convenciones:
 - **No:** híbrido (gamepad + gestos donde convienen). Tiene la misma complejidad que los gestos nativos para dos de los cuatro juegos.
 - **Sí:** `touchControls` en `registry.ts`, junto a `skins` y `maxPlausibleScore`. El shell sabe qué dibujar sin cargar el chunk del motor, y todo lo que la plataforma necesita saber de un juego queda en un solo lugar.
 - **No:** que cada motor exporte su layout táctil. Obligaría a esperar el `import()` del motor para dibujar el gamepad.
+- **Sí:** cruceta siempre completa, con las direcciones sin uso deshabilitadas. Pedido del usuario durante la implementación: el gamepad tiene la misma forma en todos los juegos y se reconoce como un mando.
+- **No:** dibujar solo las direcciones que usa cada juego. Dejaba cruces incompletas (dos teclas sueltas en BLOQUE BUSTER) que no se leen como un gamepad.
 - **Sí:** `repeat` por botón, emulado con timers. CAÍDA depende del auto-repeat nativo del teclado (`tetris-engine.ts`) y los eventos sintéticos no se repiten solos. Los demás motores leen teclas por polling y no lo necesitan.
 - **Sí:** Pointer Events con `setPointerCapture`, en lugar de Touch Events. Un solo modelo para dedo, lápiz y mouse, con multitouch nativo (un puntero por dedo) y `keyup` garantizado aunque el dedo se salga del botón.
 - **Sí:** detección con `(pointer: coarse)`. Muestra el gamepad por tipo de puntero y no por ancho, así que funciona en tablets y no aparece en ventanas chicas de desktop.

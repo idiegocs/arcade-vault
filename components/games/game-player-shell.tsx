@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { saveScore } from "@/app/actions/scores";
 import {
   ARENA_HEIGHT,
@@ -13,6 +13,7 @@ import {
 } from "./game-engine";
 import { GAME_ENGINES } from "./registry";
 import { getSavedSkin, saveSkin, SKIN_LABELS } from "./skins";
+import { TouchGamepad } from "./touch-gamepad";
 
 type Props = {
   gameId: string;
@@ -24,6 +25,24 @@ type Props = {
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const INITIAL_STATE: EngineState = { score: 0, lives: 3, level: 1, phase: "playing" };
+
+const COARSE_POINTER = "(pointer: coarse)";
+
+function subscribeCoarsePointer(onChange: () => void) {
+  const mq = window.matchMedia(COARSE_POINTER);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+/** `true` si el puntero principal es táctil. En el servidor (y durante la
+ * hidratación) vale `false`, así el primer render calza con el HTML. */
+function useIsTouch() {
+  return useSyncExternalStore(
+    subscribeCoarsePointer,
+    () => window.matchMedia(COARSE_POINTER).matches,
+    () => false
+  );
+}
 
 /**
  * Shell genérico y reutilizable para cualquier motor de juego que cumpla
@@ -45,6 +64,9 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
   const [skin, setSkin] = useState<SkinId>(DEFAULT_SKIN);
 
   const skinOptions = GAME_ENGINES[gameId]?.skins;
+  const touchControls = GAME_ENGINES[gameId]?.touchControls;
+  const isTouch = useIsTouch();
+  const showGamepad = isTouch && !!touchControls;
 
   useEffect(() => {
     let cancelled = false;
@@ -125,7 +147,7 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
   const isGameOver = state.phase === "gameover";
 
   return (
-    <div className="av-player fade-in">
+    <div className={showGamepad ? "av-player fade-in is-touch" : "av-player fade-in"}>
       <div className="player-hud">
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div className="hud-stat">
@@ -248,6 +270,8 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
           <span>CARGA · 1MB</span>
         </div>
       </div>
+
+      {showGamepad && touchControls ? <TouchGamepad controls={touchControls} /> : null}
 
       {isGameOver && (
         <div className="modal-bd">
