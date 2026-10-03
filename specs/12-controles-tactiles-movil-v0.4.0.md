@@ -20,6 +20,9 @@
   - Botón PANTALLA COMPLETA (Fullscreen API), oculto si el navegador no la soporta.
   - Vibración (`navigator.vibrate`) cuando `lives` baja y al pasar a `phase: "gameover"`, sin efecto donde no existe la API.
 - `app/globals.css`: estilos del gamepad y del layout táctil vertical/horizontal. `touch-action: none` y `user-select: none` en la zona de juego para que los toques no hagan scroll, zoom ni seleccionen texto.
+- En táctil, el HUD del reproductor se compacta: el selector de skins pasa a ser un desplegable (`<select>`) y PAUSA/FIN/SALIR pasan a ser íconos (❚❚ / ▶, ■, ✕) con `aria-label`. En desktop el HUD no cambia.
+- En horizontal y táctil, "modo juego": el reproductor cubre toda la pantalla (encima del nav y el footer), con el HUD en una fila fina y los mandos a los costados del canvas.
+- `app/globals.css` (nav): en pantallas de hasta 520px el nav muestra solo el logo y la hamburguesa, porque el sonido y la sesión ya están en el menú. El panel móvil cerrado no suma ancho (`html { overflow-x: clip }`).
 - `components/games/README.md`: documenta `touchControls` en la receta para agregar un juego.
 - `package.json`: version `0.3.0` → `0.4.0`.
 - `CHANGELOG.md`: entrada para `0.4.0` enlazando a este spec.
@@ -29,7 +32,7 @@
 - Gestos nativos por motor (swipe en SERPENTINA, arrastrar la paleta en BLOQUE BUSTER, tocar para disparar): descartado en favor de un gamepad único.
 - Cualquier cambio en los motores (`*-engine.ts`) o en el contrato `game-engine.ts`.
 - Los 4 juegos sin motor (mock estático de `app/juegos/[id]/jugar/page.tsx`).
-- Revisión responsive del resto del sitio (home, catálogo, ranking, auth, about).
+- Revisión responsive del resto del sitio (home, catálogo, ranking, auth, about), salvo el arreglo mínimo del nav descrito en Alcance.
 - Vibración al pulsar los botones del gamepad.
 - Toggle manual para mostrar/ocultar el gamepad, y personalizar botones, tamaño u opacidad.
 - Gamepads físicos (Gamepad API).
@@ -138,7 +141,14 @@ Cada paso termina con algo que se puede abrir en la app y verificar. Los pasos 2
 
    Prueba manual: en DevTools modo dispositivo (iPhone/Pixel) aparece el gamepad. ROCAS, BLOQUE BUSTER y SERPENTINA se pueden jugar, y CAÍDA responde toque a toque. En desktop sin emulación el gamepad no aparece.
 3. **Repetición:** agregar a `TouchGamepad` el soporte de `repeat` con `REPEAT_DELAY_MS`/`REPEAT_INTERVAL_MS`, y limpiar los timers en `keyup` y al desmontar. Prueba manual: en CAÍDA, mantener ◀ o ▼ mueve la pieza de forma continua.
-4. **Layout horizontal:** con `@media (pointer: coarse) and (orientation: landscape)`, la cruceta queda a la izquierda del canvas y las acciones a la derecha. El canvas toma la altura disponible (`100dvh`) manteniendo 4:3. Prueba manual: girar el dispositivo emulado → los controles pasan a los costados sin scroll de página.
+4. **Layout horizontal y ajuste a cualquier celular:**
+   - Con `@media (pointer: coarse) and (orientation: landscape)`, el reproductor pasa a "modo juego": `position: fixed` sobre nav y footer, HUD en una fila y grilla `dpad | canvas | acciones`, con las acciones apiladas en vertical.
+   - El canvas mantiene 4:3 y toma el mayor tamaño que entra entre el alto (`100dvh`) y el ancho que dejan los mandos.
+   - Los tamaños de la cruceta y las acciones son fluidos (dependen de `vw`/`dvh`), así que entran en celulares de 360px.
+   - En táctil, el skin pasa a desplegable y PAUSA/FIN/SALIR a íconos, y se reduce la separación entre pantalla y mandos.
+   - Nav de hasta 520px: solo logo y hamburguesa; el panel cerrado no ensancha la página.
+
+   Prueba manual: girar el dispositivo emulado → los controles pasan a los costados sin scroll de página. En 360×740, 390×844, 640×360, 667×375 y 800×360 ningún botón queda fuera de pantalla.
 5. **Pausa automática:** en el shell, listener de `visibilitychange`: si `document.hidden && state.phase === "playing"`, llama a `engineRef.current.pause()`. `TouchGamepad` también escucha `visibilitychange` y suelta las teclas apretadas. Prueba manual: cambiar de pestaña a mitad de partida → al volver aparece EN PAUSA. Funciona igual en desktop.
 6. **Pantalla completa:** botón PANTALLA COMPLETA / SALIR DE PANTALLA COMPLETA en `.hud-actions`, solo si `document.fullscreenEnabled`. Llama a `requestFullscreen()` sobre `.av-player` o a `document.exitFullscreen()`, y sigue `fullscreenchange` en `isFullscreen`. Prueba manual: en Chrome de escritorio y de Android entra y sale de pantalla completa. En iPhone Safari el botón no aparece.
 7. **Vibración:** en el shell, `prevLivesRef`. Si `state.lives` baja → `navigator.vibrate?.(150)`; al pasar a `gameover` → `navigator.vibrate?.([100, 60, 100, 60, 300])`. Prueba manual: en un Android, perder una vida vibra y el game over vibra con un patrón más largo.
@@ -174,7 +184,9 @@ Cada paso termina con algo que se puede abrir en la app y verificar. Los pasos 2
 - [ ] Tocar o arrastrar sobre el canvas o el gamepad no hace scroll, zoom ni selección de texto, y no abre el menú contextual de mantener apretado.
 - [ ] En vertical: canvas arriba, gamepad abajo, todo dentro de la pantalla sin scroll horizontal (probado a 375×667).
 - [ ] En horizontal: cruceta a la izquierda del canvas, acciones a la derecha, sin scroll de página (probado a 667×375).
-- [ ] PAUSA, FIN, SALIR y el selector de skins siguen funcionando con el dedo.
+- [ ] PAUSA, FIN, SALIR y el selector de skins siguen funcionando con el dedo. En táctil se muestran como íconos (❚❚/▶, ■, ✕) y como desplegable.
+- [ ] En horizontal y táctil, el reproductor ocupa toda la pantalla (no se ven nav ni footer) y ✕ vuelve a la ficha del juego.
+- [ ] En celulares de hasta 520px de ancho, el nav muestra solo el logo y la hamburguesa, y el menú incluye sonido e inicio de sesión.
 
 **Extras**
 
@@ -214,6 +226,11 @@ Cada paso termina con algo que se puede abrir en la app y verificar. Los pasos 2
 - **Sí:** `touch-action: none` solo en `.crt` y en el gamepad, no en todo el sitio. El resto de las páginas conserva scroll y zoom (accesibilidad).
 - **No:** `user-scalable=no` en el viewport. Bloquearía el zoom en todo el sitio.
 - **Sí:** incluir `allowedDevOrigins: ["192.168.*.*"]` en este spec. Sin eso el gamepad no se puede probar desde un celular real en desarrollo. El comodín sobrevive a cambios de IP en la red local y no afecta producción.
+- **Sí:** "modo juego" a pantalla completa en horizontal táctil (decidido con el usuario durante la implementación). Con el nav (unos 80px) y el HUD, al canvas le quedaban menos de 200px de alto en un celular de 375px.
+- **No:** mantener el nav en horizontal, porque obligaba a hacer scroll o dejaba un canvas diminuto.
+- **Sí:** arreglo mínimo del nav en este spec (decidido con el usuario). El nav desbordaba a 492px y el navegador móvil agrandaba toda la página, lo que sacaba de pantalla los botones de acción del gamepad. Bloqueaba el criterio "sin scroll horizontal".
+- **Sí:** desplegable de skin e íconos en PAUSA/FIN/SALIR, solo en táctil (pedido del usuario al probarlo en su celular). Liberan el ancho que necesita el HUD en una sola fila en horizontal. Desktop se mantiene igual que en v0.3.0.
+- **Sí:** tamaños fluidos (`min(54px, calc((100vw - 112px) / 5.4))`) en lugar de tamaños fijos. Con tamaños fijos, el gamepad no entraba en celulares más angostos que 390px.
 - **Sí:** versión minor `0.3.0` → `0.4.0`. Es funcionalidad nueva visible al usuario, y sigue la convención de la v0.2.0 y la v0.3.0.
 
 ## Riesgos

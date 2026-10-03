@@ -181,51 +181,76 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
               <div className="l" id="skin-label">
                 Skin
               </div>
-              <div role="group" aria-labelledby="skin-label" style={{ display: "flex", gap: 6 }}>
-                {skinOptions.map((id) => {
-                  const active = id === skin;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={active}
-                      className={active ? "btn" : "btn ghost"}
-                      disabled={!ready}
-                      onClick={() => handleSkinChange(id)}
-                      style={{
-                        padding: "6px 10px",
-                        fontSize: 8,
-                        color: active ? "var(--cyan)" : undefined,
-                        textShadow: active ? "0 0 6px rgba(0,245,255,0.5)" : undefined,
-                      }}
-                    >
+              {isTouch ? (
+                // En táctil, un desplegable ocupa mucho menos que tres botones.
+                <select
+                  className="hud-skin-select"
+                  aria-labelledby="skin-label"
+                  value={skin}
+                  disabled={!ready}
+                  onChange={(e) => handleSkinChange(e.target.value as SkinId)}
+                >
+                  {skinOptions.map((id) => (
+                    <option key={id} value={id}>
                       {SKIN_LABELS[id]}
-                    </button>
-                  );
-                })}
-              </div>
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div role="group" aria-labelledby="skin-label" style={{ display: "flex", gap: 6 }}>
+                  {skinOptions.map((id) => {
+                    const active = id === skin;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-pressed={active}
+                        className={active ? "btn" : "btn ghost"}
+                        disabled={!ready}
+                        onClick={() => handleSkinChange(id)}
+                        style={{
+                          padding: "6px 10px",
+                          fontSize: 8,
+                          color: active ? "var(--cyan)" : undefined,
+                          textShadow: active ? "0 0 6px rgba(0,245,255,0.5)" : undefined,
+                        }}
+                      >
+                        {SKIN_LABELS[id]}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : null}
         </div>
-        <div className="hud-actions">
+        <div className={isTouch ? "hud-actions is-icons" : "hud-actions"}>
           <button
             className="btn yellow"
             type="button"
             onClick={handlePauseToggle}
             disabled={!ready || isGameOver}
+            aria-label={state.phase === "paused" ? "Reanudar" : "Pausa"}
           >
-            {state.phase === "paused" ? "REANUDAR" : "PAUSA"}
+            {isTouch
+              ? state.phase === "paused"
+                ? "▶"
+                : "❚❚"
+              : state.phase === "paused"
+                ? "REANUDAR"
+                : "PAUSA"}
           </button>
           <button
             className="btn magenta"
             type="button"
             onClick={handleFin}
             disabled={!ready || isGameOver}
+            aria-label="Fin"
           >
-            FIN
+            {isTouch ? "■" : "FIN"}
           </button>
-          <Link href={`/juegos/${gameId}`} className="btn ghost">
-            SALIR
+          <Link href={`/juegos/${gameId}`} className="btn ghost" aria-label="Salir">
+            {isTouch ? "✕" : "SALIR"}
           </Link>
         </div>
       </div>
