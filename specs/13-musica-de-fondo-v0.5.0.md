@@ -1,6 +1,6 @@
 # SPEC 13 — Música de fondo en los juegos
 
-> **Estado:** aprobado
+> **Estado:** Implementado
 
 > **Depende de:** 08-libreria-sonido-motores-v0.2.2 (`audio.ts`, mute global), 12-controles-tactiles-movil-v0.4.0 (HUD táctil)
 > **Fecha:** 2026-10-03

@@ -53,6 +53,9 @@ automatizan, para cuando necesites entender o revisar lo que hicieron.
    la sección "Controles táctiles" abajo); sin eso, en el celular el juego
    no muestra gamepad y no se puede jugar.
 
+6. Elige su música de fondo en la misma entrada (`music: "<trackId>"`, ver la
+   sección "Música de fondo" abajo); sin `music`, el juego no tiene música.
+
 Con eso, `/juegos/<id>/jugar` usa el motor real automáticamente —
 `game-player-shell.tsx`, el HUD, la pausa, el modal de fin de partida y el
 guardado de puntuación no se tocan.
@@ -91,6 +94,40 @@ touchControls: {
 - **Requisitos del motor** para que el gamepad funcione: escuchar
   `keydown`/`keyup` en `window`, comparar `e.code` (no `e.key`) y no filtrar
   `e.isTrusted`.
+
+## Música de fondo
+
+Música chiptune sintetizada con Web Audio, sin archivos (spec
+`13-musica-de-fondo-v0.5.0`). La maneja la plataforma, no el motor: el
+reproductor la arranca con la partida, la pausa con la pausa (también la
+automática), la detiene en game over y la reinicia con JUGAR DE NUEVO.
+
+- `music-tracks.ts`: catálogo compartido (`TRACK_IDS`, `MUSIC_TRACKS`).
+- `music.ts`: secuenciador con lookahead sobre el `AudioContext` de
+  `audio.ts` (`playTrack` / `pauseMusic` / `resumeMusic` / `stopMusic`),
+  volumen de música propio (0–100, default 30, en
+  `arcade-vault:music-volume`) y la pista elegida por juego
+  (`av-music:<gameId>`). Respeta el mute global (♪ del nav) en vivo.
+- `registry.ts`: `music?: TrackId`, la pista por defecto del juego. El
+  jugador puede elegir otra (o SIN MÚSICA) en el panel de ajustes ⚙ del
+  reproductor, junto a la skin.
+
+### Agregar una pista al catálogo
+
+1. Suma su id a `TRACK_IDS` en `music-tracks.ts` (el tipo `TrackId` sale de
+   ahí).
+2. Agrega su entrada a `MUSIC_TRACKS`: `label` (lo que se ve en el
+   selector), `bpm` y hasta 3 `voices` (`wave`, `gain` relativo 0–1,
+   `notes`).
+3. Escribe las notas con `seq()`: pares `<nota> <tiempos>`, ej.
+   `"E5 1 B4 .5 - 2"`. `C4` = Do central (MIDI 60), `#`/`b` para
+   alteraciones, `-` para silencio; los `|` separan compases y se ignoran.
+4. **Todas las voces de una pista deben sumar los mismos tiempos**, o el
+   bucle se desfasa; `music.ts` lo avisa por consola en desarrollo.
+   Conviene que dure al menos 16 compases para que no canse.
+
+Las pistas son composiciones originales: no transcribir música con
+derechos.
 
 ## Skins
 

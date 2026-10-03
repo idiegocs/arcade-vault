@@ -6,6 +6,24 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.5.0] - 2026-10-03
+
+Spec: [`13-musica-de-fondo-v0.5.0`](specs/13-musica-de-fondo-v0.5.0.md)
+
+### Added
+
+- Música de fondo chiptune, sintetizada con Web Audio (sin archivos), en los 4 juegos con motor. Catálogo de 4 pistas originales, cada una la de un juego por defecto: BLOQUES (CAÍDA), ÓRBITA (ROCAS), TURBO (BLOQUE BUSTER) y JARDÍN (SERPENTINA).
+- La música sigue a la partida: se pausa con la pausa (también la automática), se detiene en game over, vuelve a empezar con JUGAR DE NUEVO y se calla al salir del reproductor. Respeta el ♪ del nav en vivo, sin reiniciar la pista.
+- Panel de ajustes ⚙ en el reproductor, en desktop y táctil, con la skin, la pista (cualquiera de las 4 o SIN MÚSICA) y el volumen de la música (0–100, por defecto 30). Abrirlo pausa la partida y cerrarlo la reanuda solo si la pausó el panel. Se recuerdan el volumen (global) y la pista de cada juego.
+- Campo `music` en `components/games/registry.ts` para la pista por defecto de cada juego.
+
+### Changed
+
+- El HUD del reproductor muestra los datos de la partida y los íconos ⚙ ❚❚ ■ ⤢ ✕ también en desktop. La skin pasa al panel de ajustes. En táctil, el HUD va en una fila compacta y sin "Jugador".
+- En escritorio, el gabinete CRT se ajusta al alto de la ventana para que el juego entre sin scroll. En pantalla completa, la pantalla del juego ocupa todo el espacio que deja el HUD.
+- En pantalla completa en celular vertical, todo entra sin scroll: HUD arriba, juego centrado y mandos abajo.
+- CAÍDA ya no sortea la pieza O (cuadrado 2×2).
+
 ## [0.4.0] - 2026-10-03
 
 Spec: [`12-controles-tactiles-movil-v0.4.0`](specs/12-controles-tactiles-movil-v0.4.0.md)
