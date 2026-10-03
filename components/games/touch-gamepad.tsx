@@ -35,6 +35,17 @@ export type TouchControls = {
   actions?: TouchButton[];
 };
 
+/** Imitan el auto-repeat típico de un teclado. */
+const REPEAT_DELAY_MS = 200;
+const REPEAT_INTERVAL_MS = 60;
+
+type Held = {
+  id: string;
+  button: TouchButton;
+  /** Timer del auto-repeat (solo botones con `repeat`). */
+  timer?: ReturnType<typeof setTimeout>;
+};
+
 const DPAD_SLOTS: readonly DpadSlot[] = ["up", "left", "right", "down"];
 
 /** Flecha de un slot que el juego no declara (se dibuja deshabilitado). */
@@ -56,13 +67,20 @@ function emitKey(type: "keydown" | "keyup", code: string) {
   window.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true, cancelable: true }));
 }
 
+/** Corta el auto-repeat y emite el `keyup` de un botón soltado. */
+function releaseHeld(held: Held) {
+  clearTimeout(held.timer);
+  clearInterval(held.timer);
+  emitKey("keyup", held.button.code);
+}
+
 /**
  * Cada dedo (pointerId) que aprieta un botón queda registrado hasta que lo
  * suelta, para emitir su `keyup` aunque el dedo se salga del botón
  * (`setPointerCapture`) o el gamepad se desmonte a mitad de una pulsación.
  */
 export function TouchGamepad({ controls }: { controls: TouchControls }) {
-  const heldRef = useRef(new Map<number, { id: string; button: TouchButton }>());
+  const heldRef = useRef(new Map<number, Held>());
   const [pressed, setPressed] = useState<ReadonlySet<string>>(() => new Set());
 
   const syncPressed = useCallback(() => {
@@ -72,8 +90,16 @@ export function TouchGamepad({ controls }: { controls: TouchControls }) {
   const press = (e: ReactPointerEvent<HTMLButtonElement>, id: string, button: TouchButton) => {
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    heldRef.current.set(e.pointerId, { id, button });
+    const held: Held = { id, button };
+    heldRef.current.set(e.pointerId, held);
     emitKey("keydown", button.code);
+    if (button.repeat) {
+      // Mismo patrón que el auto-repeat del teclado: una pausa y después
+      // ráfaga. `held.timer` pasa del timeout al interval al vencer la pausa.
+      held.timer = setTimeout(() => {
+        held.timer = setInterval(() => emitKey("keydown", button.code), REPEAT_INTERVAL_MS);
+      }, REPEAT_DELAY_MS);
+    }
     syncPressed();
   };
 
@@ -81,14 +107,14 @@ export function TouchGamepad({ controls }: { controls: TouchControls }) {
     const held = heldRef.current.get(e.pointerId);
     if (!held) return;
     heldRef.current.delete(e.pointerId);
-    emitKey("keyup", held.button.code);
+    releaseHeld(held);
     syncPressed();
   };
 
   useEffect(() => {
     const held = heldRef.current;
     return () => {
-      for (const { button } of held.values()) emitKey("keyup", button.code);
+      for (const h of held.values()) releaseHeld(h);
       held.clear();
     };
   }, []);
