@@ -110,6 +110,22 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     [gameId]
   );
 
+  // Pausa automática al ocultarse la pestaña (cambio de pestaña/app, celular
+  // bloqueado), en todos los dispositivos. Nunca reanuda sola: al volver
+  // queda EN PAUSA hasta tocar REANUDAR.
+  const phaseRef = useRef(state.phase);
+  useEffect(() => {
+    phaseRef.current = state.phase;
+  }, [state.phase]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden && phaseRef.current === "playing") engineRef.current?.pause();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
   // Guarda automáticamente al entrar a game over, una sola vez por partida.
   useEffect(() => {
     if (state.phase !== "gameover") return;

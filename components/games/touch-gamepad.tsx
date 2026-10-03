@@ -111,13 +111,25 @@ export function TouchGamepad({ controls }: { controls: TouchControls }) {
     syncPressed();
   };
 
+  // Suelta todo al desmontar y al ocultarse la pestaña: con la página en
+  // segundo plano el `pointerup` puede no llegar nunca.
   useEffect(() => {
     const held = heldRef.current;
+    const releaseAll = () => {
+      for (const h of held.values()) releaseHeld(h);
+      held.clear();
+      syncPressed();
+    };
+    const handleVisibility = () => {
+      if (document.hidden) releaseAll();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
       for (const h of held.values()) releaseHeld(h);
       held.clear();
     };
-  }, []);
+  }, [syncPressed]);
 
   const renderButton = (
     id: string,
