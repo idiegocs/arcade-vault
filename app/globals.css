@@ -703,6 +703,151 @@ a { color: inherit; text-decoration: none; }
   background: var(--green); box-shadow: 0 0 6px var(--green);
 }
 
+/* Escritorio: el gabinete limita su ancho según el alto de la ventana, para
+   que la pantalla 4:3 entre entera sin scroll. 365px ≈ lo que ocupan nav,
+   HUD y bisel alrededor de la pantalla (sin nav en pantalla completa:
+   ~250px). Al cambiar el tamaño de la ventana se reajusta solo. (Ajuste
+   pedido en spec 13.) */
+.av-player:not(.is-touch) .crt {
+  max-width: max(400px, calc((100dvh - 365px) * 4 / 3 + 48px));
+  margin-inline: auto;
+}
+/* Pantalla completa en escritorio: la pantalla 4:3 toma el máximo posible.
+   El reproductor ocupa toda la pantalla (sin el tope de 1100px), el HUD
+   arriba y el gabinete se lleva todo el resto; la pantalla mide el gabinete
+   (container query) y usa el lado que limite: ancho o alto × 4/3. */
+.av-player:not(.is-touch):fullscreen {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: 10px 16px 16px;
+  overflow: hidden;
+}
+.av-player:not(.is-touch):fullscreen .player-hud { flex: none; margin-bottom: 14px; }
+.av-player:not(.is-touch):fullscreen .crt {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  padding: 12px;
+  border-radius: 18px;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.av-player:not(.is-touch):fullscreen .crt-screen {
+  width: min(100cqw, 100cqh * 4 / 3);
+  flex: none;
+}
+.av-player:not(.is-touch):fullscreen .crt-bottom { display: none; }
+
+/* ===== control de música (spec 13) ===== */
+/* Volumen como vúmetro de 10 LEDs: un <input type="range"> nativo (teclado,
+   lector de pantalla y foco intactos) cuyo track pinta 10 segmentos con el
+   color fijo por posición (cian → amarillo → magenta, como un vúmetro) y
+   apaga los que quedan por encima de --level. */
+.vu-slider {
+  --level: 30%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.vu-slider::-webkit-slider-runnable-track {
+  height: 14px;
+  background:
+    repeating-linear-gradient(to right, transparent 0 calc(10% - 2px), var(--bg-2) calc(10% - 2px) 10%),
+    linear-gradient(to right, transparent var(--level), var(--bg-3) var(--level)),
+    linear-gradient(to right, var(--cyan), var(--yellow) 60%, var(--magenta));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.vu-slider::-moz-range-track {
+  height: 14px;
+  background:
+    repeating-linear-gradient(to right, transparent 0 calc(10% - 2px), var(--bg-2) calc(10% - 2px) 10%),
+    linear-gradient(to right, transparent var(--level), var(--bg-3) var(--level)),
+    linear-gradient(to right, var(--cyan), var(--yellow) 60%, var(--magenta));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* El "pulgar" es una raya fina: el nivel lo cuentan los LEDs encendidos. */
+.vu-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 3px;
+  height: 18px;
+  margin-top: -2px;
+  background: var(--ink);
+  box-shadow: 0 0 6px var(--ink);
+}
+.vu-slider::-moz-range-thumb {
+  width: 3px;
+  height: 18px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+  box-shadow: 0 0 6px var(--ink);
+}
+.vu-slider:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.vu-value {
+  min-width: 3ch;
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--cyan);
+  text-shadow: 0 0 6px rgba(0,245,255,0.5);
+}
+
+/* Panel de ajustes ⚙ (skin + música), en todos los dispositivos: el mismo
+   marco que el modal de game over, en cian, con controles a tamaño de dedo.
+   Los segmentos del vúmetro van en % (10 por track), así escalan con el ancho. */
+.settings-panel {
+  width: min(360px, 92vw);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 30px rgba(0,245,255,0.3), inset 0 0 16px rgba(0,245,255,0.12);
+  padding: 22px 20px 20px;
+  position: relative;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.settings-panel::before {
+  content: ""; position: absolute; inset: 4px;
+  border: 1px dashed rgba(0,245,255,0.3);
+  pointer-events: none;
+}
+.settings-panel h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-size: 14px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0,245,255,0.7);
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+.settings-field { display: flex; flex-direction: column; gap: 12px; }
+.settings-field .l { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0.14em; text-transform: uppercase; }
+.settings-panel .hud-skin-select { width: 100%; min-height: 44px; font-size: 10px; padding-left: 12px; }
+.settings-volume { display: flex; align-items: center; gap: 12px; }
+.settings-panel .vu-slider { flex: 1; width: auto; height: 44px; }
+.settings-panel .vu-slider::-webkit-slider-runnable-track { height: 26px; }
+.settings-panel .vu-slider::-moz-range-track { height: 26px; }
+.settings-panel .vu-slider::-webkit-slider-thumb { width: 5px; height: 36px; margin-top: -5px; }
+.settings-panel .vu-slider::-moz-range-thumb { width: 5px; height: 36px; }
+.settings-panel .vu-value { font-size: 11px; }
+.settings-panel > .btn { align-self: stretch; min-height: 44px; position: relative; }
+
+/* Horizontal: poco alto, el panel se compacta para no salirse de pantalla. */
+@media (pointer: coarse) and (orientation: landscape) {
+  .settings-panel { padding: 14px 18px; gap: 10px; }
+  .settings-field { gap: 8px; }
+  .settings-panel .hud-skin-select,
+  .settings-panel > .btn { min-height: 38px; }
+  .settings-panel .vu-slider { height: 38px; }
+}
+
 /* ===== touch gamepad (spec 12) ===== */
 /* La zona de juego no hace scroll, zoom, selección ni menú de mantener
    apretado: cada toque ahí es input del juego. Solo aquí, no en todo el sitio. */
@@ -717,11 +862,18 @@ a { color: inherit; text-decoration: none; }
 
 /* En táctil la pantalla y los mandos tienen que entrar juntos en la
    pantalla del celular: HUD compacto, bisel fino, sin la franja decorativa. */
-.av-player.is-touch { margin: 10px auto; padding-bottom: 20px; }
-.av-player.is-touch .player-hud { gap: 10px 14px; padding: 10px 12px; margin-bottom: 8px; }
-.av-player.is-touch .player-hud > div:first-child { gap: 10px 16px !important; }
-.av-player.is-touch .hud-stat .l { font-size: 9px; }
-.av-player.is-touch .hud-stat .v { font-size: 12px; }
+/* HUD táctil en una sola fila (datos + ⚙ ❚❚ ■ ⤢ ✕), así la pantalla del juego
+   gana alto. "Jugador" se oculta: el nombre ya está en el nav. Si en un
+   celular angosto no entra, los íconos bajan a una segunda fila (nunca más). */
+.av-player.is-touch { margin: 10px auto; padding: 0 10px 20px; }
+.av-player.is-touch .player-hud { gap: 6px 8px; padding: 6px 8px; margin-bottom: 8px; }
+.av-player.is-touch .player-hud > div:first-child { flex-wrap: nowrap !important; gap: 10px !important; }
+.av-player.is-touch .hud-stat.player { display: none; }
+.av-player.is-touch .hud-stat { gap: 2px; }
+.av-player.is-touch .hud-stat .l { font-size: 7px; letter-spacing: 0.08em; }
+.av-player.is-touch .hud-stat .v { font-size: 10px; white-space: nowrap; }
+.av-player.is-touch .hud-actions { gap: 5px; }
+.av-player.is-touch .hud-actions.is-icons .btn { width: 32px; height: 30px; font-size: 12px; }
 .av-player.is-touch .crt { padding: 8px; border-radius: 16px; }
 .av-player.is-touch .crt-bottom { display: none; }
 
@@ -734,7 +886,30 @@ a { color: inherit; text-decoration: none; }
   background: var(--bg);
   overflow-y: auto;
 }
-.av-player.is-touch:fullscreen { padding: 10px 16px; }
+.av-player.is-touch:fullscreen { padding: 6px 8px; }
+
+/* Pantalla completa en celular vertical: todo entra sin scroll. HUD arriba,
+   mandos pegados abajo y la pantalla en el medio, centrada en el espacio que
+   queda. La pantalla es 4:3 y en vertical la limita el ancho (ya usa todo el
+   ancho del celular): el alto sobrante no la agranda, así que el gabinete se
+   ajusta a ella (sin caja negra de relleno) y los mandos crecen. */
+@media (orientation: portrait) {
+  .av-player.is-touch:fullscreen {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    padding: max(6px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+  .av-player.is-touch:fullscreen .player-hud { flex: none; margin-bottom: 0; }
+  .av-player.is-touch:fullscreen .crt { flex: none; padding: 6px; margin-block: auto; }
+  .av-player.is-touch:fullscreen .crt-screen { width: 100%; }
+  .av-player.is-touch:fullscreen .touch-pad {
+    flex: none;
+    margin-top: 0;
+    --key: min(68px, calc((100vw - 112px) / 5.4), calc((100dvh - 100vw * 0.75 - 200px) / 3.6));
+  }
+}
 
 /* Con el reproductor tapando toda la pantalla (pantalla completa, o modo juego
    horizontal en táctil) el fondo animado del sitio no se ve, pero el

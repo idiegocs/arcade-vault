@@ -257,6 +257,11 @@ const PIECES: number[][][] = [
   ], // N (tuerca)
 ];
 
+/** Tipos que pueden salir. La O (tipo 2) queda definida en `PIECES` (los
+ * colores de cada skin se indexan por tipo) pero no se sortea: pedido del
+ * usuario durante el spec 13. */
+const SPAWNABLE = [1, 3, 4, 5, 6, 7, 8];
+
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
 type Piece = { type: number; shape: number[][]; x: number; y: number };
@@ -315,7 +320,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
   }
 
   function randomPiece(): Piece {
-    const type = Math.floor(Math.random() * 8) + 1;
+    const type = SPAWNABLE[Math.floor(Math.random() * SPAWNABLE.length)];
     const shape = PIECES[type].map((row) => [...row]);
     return {
       type,

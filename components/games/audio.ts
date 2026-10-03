@@ -14,6 +14,7 @@ const MUTE_KEY = "arcade-vault:muted";
 
 let ctx: AudioContext | null = null;
 let muted = typeof window !== "undefined" && localStorage.getItem(MUTE_KEY) === "true";
+const muteListeners = new Set<(muted: boolean) => void>();
 
 /**
  * `AudioContext` singleton de módulo, creado perezosamente (recién en el
@@ -36,6 +37,13 @@ function getContext(): AudioContext | null {
   return ctx;
 }
 
+/** El `AudioContext` compartido de la página (el mismo de los efectos), para
+ * que otros módulos de audio — la música (`music.ts`, spec 13) — no creen
+ * uno propio. `null` en SSR o sin soporte de Web Audio. */
+export function getAudioContext(): AudioContext | null {
+  return getContext();
+}
+
 export function isMuted(): boolean {
   return muted;
 }
@@ -45,6 +53,16 @@ export function setMuted(next: boolean): void {
   if (typeof window !== "undefined") {
     localStorage.setItem(MUTE_KEY, String(next));
   }
+  for (const listener of muteListeners) listener(next);
+}
+
+/** Avisa cada vez que cambia el mute global (♪ del nav). Devuelve la función
+ * para desuscribirse. */
+export function onMuteChange(listener: (muted: boolean) => void): () => void {
+  muteListeners.add(listener);
+  return () => {
+    muteListeners.delete(listener);
+  };
 }
 
 /** Alterna el mute y devuelve el nuevo estado. */

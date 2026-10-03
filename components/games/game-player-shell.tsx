@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { saveScore } from "@/app/actions/scores";
 import {
   ARENA_HEIGHT,
@@ -11,6 +18,17 @@ import {
   type EngineState,
   type SkinId,
 } from "./game-engine";
+import {
+  getMusicVolume,
+  getSavedMusic,
+  pauseMusic,
+  playTrack,
+  resumeMusic,
+  saveMusic,
+  setMusicVolume,
+  stopMusic,
+} from "./music";
+import { MUSIC_TRACKS, TRACK_IDS, type MusicChoice } from "./music-tracks";
 import { GAME_ENGINES } from "./registry";
 import { getSavedSkin, saveSkin, SKIN_LABELS } from "./skins";
 import { TouchGamepad } from "./touch-gamepad";
@@ -90,8 +108,17 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
   // guardada se lee recién en el cliente, al crear el motor (ver nav.tsx,
   // mismo gotcha de hidratación que el mute).
   const [skin, setSkin] = useState<SkinId>(DEFAULT_SKIN);
+  // Música (spec 13): mismo patrón que la skin — default del registro en el
+  // primer render; lo guardado se lee en el efecto que crea el motor.
+  const music = GAME_ENGINES[gameId]?.music;
+  const [musicChoice, setMusicChoice] = useState<MusicChoice>(music ?? "none");
+  const [musicVolume, setMusicVolumeState] = useState(30);
+  const musicChoiceRef = useRef(musicChoice);
+  /** Se cambió de pista en pausa: al reanudar arranca la nueva desde el inicio. */
+  const musicRestartRef = useRef(false);
 
   const skinOptions = GAME_ENGINES[gameId]?.skins;
+  const hasSettings = (skinOptions?.length ?? 0) > 0 || !!music;
   const touchControls = GAME_ENGINES[gameId]?.touchControls;
   const isTouch = useIsTouch();
   const showGamepad = isTouch && !!touchControls;
@@ -108,6 +135,7 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     if (!loadEngine) return;
 
     const savedSkin = getSavedSkin(gameId);
+    const initialMusic = registration.music ? getSavedMusic(gameId, registration.music) : "none";
     const initialSkin = registration.skins?.includes(savedSkin) ? savedSkin : DEFAULT_SKIN;
 
     loadEngine().then((createEngine) => {
@@ -117,12 +145,19 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
       setSkin(initialSkin);
       setReady(true);
       handle.start();
+      // Música de fondo (spec 13): antes del primer gesto queda en espera y
+      // arranca sola con la primera tecla o toque (ver `music.ts`).
+      musicChoiceRef.current = initialMusic;
+      setMusicChoice(initialMusic);
+      setMusicVolumeState(getMusicVolume());
+      if (initialMusic !== "none") playTrack(initialMusic);
     });
 
     return () => {
       cancelled = true;
       handle?.destroy();
       engineRef.current = null;
+      stopMusic();
     };
   }, [gameId]);
 
@@ -140,6 +175,75 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     },
     [gameId]
   );
+
+  // Música según la partida (spec 13): se pausa con la pausa (también la
+  // automática), se detiene en game over y arranca desde el inicio al
+  // reiniciar. El primer `playTrack` lo hace el efecto que crea el motor.
+  const musicPhaseRef = useRef(state.phase);
+  useEffect(() => {
+    const prev = musicPhaseRef.current;
+    musicPhaseRef.current = state.phase;
+    if (!music || prev === state.phase) return;
+    const choice = musicChoiceRef.current;
+    if (state.phase === "paused") pauseMusic();
+    else if (state.phase === "gameover") stopMusic();
+    else if (prev === "paused" && !musicRestartRef.current) resumeMusic();
+    else if (choice !== "none") playTrack(choice); // JUGAR DE NUEVO, o pista cambiada en pausa
+    musicRestartRef.current = false;
+  }, [state.phase, music]);
+
+  const handleMusicChange = (next: MusicChoice) => {
+    musicChoiceRef.current = next;
+    setMusicChoice(next);
+    saveMusic(gameId, next);
+    if (state.phase === "playing") {
+      if (next === "none") stopMusic();
+      else playTrack(next);
+    } else if (state.phase === "paused") {
+      // En pausa no suena nada: la nueva pista arranca al reanudar.
+      stopMusic();
+      musicRestartRef.current = true;
+    }
+  };
+
+  const handleMusicVolume = (next: number) => {
+    setMusicVolumeState(next);
+    setMusicVolume(next);
+  };
+
+  // Fase actual para handlers y listeners que no se re-crean con cada cambio
+  // (pausa automática, teclas de juego, cierre del panel de ajustes).
+  const phaseRef = useRef(state.phase);
+  useEffect(() => {
+    phaseRef.current = state.phase;
+  }, [state.phase]);
+
+  // Panel de ajustes ⚙ (spec 13): skin y música detrás de un solo ícono, en
+  // todos los dispositivos. Pausa la partida al abrirse y, al cerrarse, la
+  // reanuda solo si fue el panel quien la pausó.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const pausedBySettingsRef = useRef(false);
+
+  const openSettings = () => {
+    pausedBySettingsRef.current = state.phase === "playing";
+    if (pausedBySettingsRef.current) engineRef.current?.pause();
+    setSettingsOpen(true);
+  };
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    if (pausedBySettingsRef.current && phaseRef.current === "paused") engineRef.current?.resume();
+    pausedBySettingsRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeSettings();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [settingsOpen, closeSettings]);
 
   // Vibración (spec 12): corta al perder una vida, patrón largo al game over.
   // Si la última vida se pierde junto con el game over, solo suena el largo.
@@ -160,11 +264,6 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
   // Pausa automática al ocultarse la pestaña (cambio de pestaña/app, celular
   // bloqueado), en todos los dispositivos. Nunca reanuda sola: al volver
   // queda EN PAUSA hasta tocar REANUDAR.
-  const phaseRef = useRef(state.phase);
-  useEffect(() => {
-    phaseRef.current = state.phase;
-  }, [state.phase]);
-
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden && phaseRef.current === "playing") engineRef.current?.pause();
@@ -235,7 +334,7 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     >
       <div className="player-hud">
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-          <div className="hud-stat">
+          <div className="hud-stat player">
             <div className="l">Jugador</div>
             <div className="v" style={{ color: "var(--ink)" }}>
               {username ? username.toUpperCase() : "INVITADO"}
@@ -261,69 +360,33 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
               </div>
             </div>
           ) : null}
-          {skinOptions && skinOptions.length > 0 ? (
-            <div className="hud-stat">
-              <div className="l" id="skin-label">
-                Skin
-              </div>
-              {isTouch ? (
-                // En táctil, un desplegable ocupa mucho menos que tres botones.
-                <select
-                  className="hud-skin-select"
-                  aria-labelledby="skin-label"
-                  value={skin}
-                  disabled={!ready}
-                  onChange={(e) => handleSkinChange(e.target.value as SkinId)}
-                >
-                  {skinOptions.map((id) => (
-                    <option key={id} value={id}>
-                      {SKIN_LABELS[id]}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div role="group" aria-labelledby="skin-label" style={{ display: "flex", gap: 6 }}>
-                  {skinOptions.map((id) => {
-                    const active = id === skin;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        aria-pressed={active}
-                        className={active ? "btn" : "btn ghost"}
-                        disabled={!ready}
-                        onClick={() => handleSkinChange(id)}
-                        style={{
-                          padding: "6px 10px",
-                          fontSize: 8,
-                          color: active ? "var(--cyan)" : undefined,
-                          textShadow: active ? "0 0 6px rgba(0,245,255,0.5)" : undefined,
-                        }}
-                      >
-                        {SKIN_LABELS[id]}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : null}
         </div>
-        <div className={isTouch ? "hud-actions is-icons" : "hud-actions"}>
+        {/* Íconos en todos los dispositivos (spec 12 en táctil, spec 13 en
+            desktop); `aria-label` y `title` conservan el nombre de cada acción. */}
+        <div className="hud-actions is-icons">
+          {hasSettings ? (
+            <button
+              className="btn"
+              type="button"
+              onClick={openSettings}
+              disabled={!ready}
+              aria-label="Ajustes"
+              aria-haspopup="dialog"
+              aria-expanded={settingsOpen}
+              title="Ajustes"
+            >
+              ⚙
+            </button>
+          ) : null}
           <button
             className="btn yellow"
             type="button"
             onClick={handlePauseToggle}
             disabled={!ready || isGameOver}
             aria-label={state.phase === "paused" ? "Reanudar" : "Pausa"}
+            title={state.phase === "paused" ? "Reanudar" : "Pausa"}
           >
-            {isTouch
-              ? state.phase === "paused"
-                ? "▶"
-                : "❚❚"
-              : state.phase === "paused"
-                ? "REANUDAR"
-                : "PAUSA"}
+            {state.phase === "paused" ? "▶" : "❚❚"}
           </button>
           <button
             className="btn magenta"
@@ -331,8 +394,9 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
             onClick={handleFin}
             disabled={!ready || isGameOver}
             aria-label="Fin"
+            title="Fin"
           >
-            {isTouch ? "■" : "FIN"}
+            ■
           </button>
           {fullscreenEnabled ? (
             <button
@@ -340,18 +404,13 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
               type="button"
               onClick={handleFullscreenToggle}
               aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+              title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
             >
-              {isTouch
-                ? isFullscreen
-                  ? "⤡"
-                  : "⤢"
-                : isFullscreen
-                  ? "SALIR DE PANTALLA COMPLETA"
-                  : "PANTALLA COMPLETA"}
+              {isFullscreen ? "⤡" : "⤢"}
             </button>
           ) : null}
-          <Link href={`/juegos/${gameId}`} className="btn ghost" aria-label="Salir">
-            {isTouch ? "✕" : "SALIR"}
+          <Link href={`/juegos/${gameId}`} className="btn ghost" aria-label="Salir" title="Salir">
+            ✕
           </Link>
         </div>
       </div>
@@ -398,6 +457,79 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
       </div>
 
       {showGamepad && touchControls ? <TouchGamepad controls={touchControls} /> : null}
+
+      {settingsOpen && (
+        <div className="modal-bd" onClick={closeSettings}>
+          <div
+            className="settings-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="settings-title">AJUSTES</h2>
+            {skinOptions && skinOptions.length > 0 ? (
+              <div className="settings-field">
+                <div className="l" id="skin-label">
+                  Skin
+                </div>
+                <select
+                  className="hud-skin-select"
+                  aria-labelledby="skin-label"
+                  value={skin}
+                  onChange={(e) => handleSkinChange(e.target.value as SkinId)}
+                >
+                  {skinOptions.map((id) => (
+                    <option key={id} value={id}>
+                      {SKIN_LABELS[id]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {music ? (
+              <div className="settings-field">
+                <div className="l" id="music-label">
+                  Música
+                </div>
+                <select
+                  className="hud-skin-select"
+                  aria-labelledby="music-label"
+                  value={musicChoice}
+                  onChange={(e) => handleMusicChange(e.target.value as MusicChoice)}
+                >
+                  {TRACK_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {MUSIC_TRACKS[id].label}
+                    </option>
+                  ))}
+                  <option value="none">SIN MÚSICA</option>
+                </select>
+                <div className="settings-volume">
+                  <input
+                    type="range"
+                    className="vu-slider"
+                    min={0}
+                    max={100}
+                    step={10}
+                    value={musicVolume}
+                    onChange={(e) => handleMusicVolume(Number(e.target.value))}
+                    aria-label="Volumen de la música"
+                    aria-valuetext={`${musicVolume} %`}
+                    style={{ "--level": `${musicVolume}%` } as CSSProperties}
+                  />
+                  <span className="vu-value" aria-hidden="true">
+                    {String(musicVolume).padStart(3, "0")}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            <button className="btn" type="button" onClick={closeSettings} autoFocus>
+              LISTO
+            </button>
+          </div>
+        </div>
+      )}
 
       {isGameOver && (
         <div className="modal-bd">

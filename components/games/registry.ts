@@ -1,4 +1,5 @@
 import type { EngineLoader, SkinId } from "./game-engine";
+import type { TrackId } from "./music-tracks";
 import type { TouchControls } from "./touch-gamepad";
 
 /**
@@ -18,12 +19,15 @@ import type { TouchControls } from "./touch-gamepad";
  * - `touchControls`: botones del gamepad virtual en pantallas táctiles, cada
  *   uno mapeado a la tecla que el motor ya escucha (spec 12). Sin
  *   `touchControls`, el reproductor no muestra gamepad.
+ * - `music`: pista de fondo por defecto del juego (`music-tracks.ts`, spec
+ *   13). El jugador puede elegir otra; sin `music`, el juego no tiene música.
  */
 export type GameRegistration = {
   load: EngineLoader;
   maxPlausibleScore: number;
   skins?: readonly SkinId[];
   touchControls?: TouchControls;
+  music?: TrackId;
 };
 
 /**
@@ -36,6 +40,7 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
     load: () => import("./rocas/asteroids-engine").then((m) => m.createAsteroidsEngine),
     maxPlausibleScore: 1_000_000,
     skins: ["clasico", "neon", "retro"],
+    music: "orbita",
     touchControls: {
       dpad: {
         up: { code: "ArrowUp", label: "▲" },
@@ -52,6 +57,7 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
     load: () => import("./caida/tetris-engine").then((m) => m.createTetrisEngine),
     maxPlausibleScore: 1_000_000,
     skins: ["clasico", "neon", "retro"],
+    music: "bloques",
     touchControls: {
       dpad: {
         left: { code: "ArrowLeft", label: "◀", repeat: true },
@@ -68,6 +74,7 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
     load: () => import("./bloque-buster/arkanoid-engine").then((m) => m.createArkanoidEngine),
     maxPlausibleScore: 2080,
     skins: ["clasico", "neon", "retro"],
+    music: "turbo",
     touchControls: {
       dpad: {
         left: { code: "ArrowLeft", label: "◀" },
@@ -79,6 +86,7 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
     load: () => import("./serpentina/snake-engine").then((m) => m.createSnakeEngine),
     maxPlausibleScore: 100_000,
     skins: ["clasico", "neon", "retro"],
+    music: "jardin",
     touchControls: {
       dpad: {
         up: { code: "ArrowUp", label: "▲" },
