@@ -34,6 +34,30 @@ function subscribeCoarsePointer(onChange: () => void) {
   return () => mq.removeEventListener("change", onChange);
 }
 
+function subscribeFullscreen(onChange: () => void) {
+  document.addEventListener("fullscreenchange", onChange);
+  return () => document.removeEventListener("fullscreenchange", onChange);
+}
+const noopSubscribe = () => () => {};
+
+/** Si el navegador permite pantalla completa en elementos (iPhone Safari
+ * no). `false` en el servidor, igual que `useIsTouch`. */
+function useFullscreenEnabled() {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => !!document.fullscreenEnabled,
+    () => false
+  );
+}
+
+function useIsFullscreen() {
+  return useSyncExternalStore(
+    subscribeFullscreen,
+    () => document.fullscreenElement !== null,
+    () => false
+  );
+}
+
 /** `true` si el puntero principal es táctil. En el servidor (y durante la
  * hidratación) vale `false`, así el primer render calza con el HTML. */
 function useIsTouch() {
@@ -67,6 +91,9 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
   const touchControls = GAME_ENGINES[gameId]?.touchControls;
   const isTouch = useIsTouch();
   const showGamepad = isTouch && !!touchControls;
+  const playerRef = useRef<HTMLDivElement>(null);
+  const fullscreenEnabled = useFullscreenEnabled();
+  const isFullscreen = useIsFullscreen();
 
   useEffect(() => {
     let cancelled = false;
@@ -160,10 +187,18 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     engineRef.current?.setSkin?.(next);
   };
 
+  const handleFullscreenToggle = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void playerRef.current?.requestFullscreen();
+  };
+
   const isGameOver = state.phase === "gameover";
 
   return (
-    <div className={showGamepad ? "av-player fade-in is-touch" : "av-player fade-in"}>
+    <div
+      ref={playerRef}
+      className={showGamepad ? "av-player fade-in is-touch" : "av-player fade-in"}
+    >
       <div className="player-hud">
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div className="hud-stat">
@@ -265,6 +300,22 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
           >
             {isTouch ? "■" : "FIN"}
           </button>
+          {fullscreenEnabled ? (
+            <button
+              className="btn"
+              type="button"
+              onClick={handleFullscreenToggle}
+              aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            >
+              {isTouch
+                ? isFullscreen
+                  ? "⤡"
+                  : "⤢"
+                : isFullscreen
+                  ? "SALIR DE PANTALLA COMPLETA"
+                  : "PANTALLA COMPLETA"}
+            </button>
+          ) : null}
           <Link href={`/juegos/${gameId}`} className="btn ghost" aria-label="Salir">
             {isTouch ? "✕" : "SALIR"}
           </Link>

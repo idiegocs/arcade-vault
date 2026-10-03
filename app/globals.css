@@ -668,7 +668,9 @@ a { color: inherit; text-decoration: none; }
   position: absolute; inset: 0;
   background: repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 2px, transparent 2px 4px);
   pointer-events: none;
-  mix-blend-mode: multiply;
+  /* Sin mix-blend-mode: multiplicar por negro semitransparente da lo mismo
+     que superponerlo, y el blend obligaba a recomponer esta capa con cada
+     frame del canvas (lento en celulares, sobre todo a pantalla completa). */
 }
 .crt-screen::before {
   content: "";
@@ -722,6 +724,28 @@ a { color: inherit; text-decoration: none; }
 .av-player.is-touch .hud-stat .v { font-size: 12px; }
 .av-player.is-touch .crt { padding: 8px; border-radius: 16px; }
 .av-player.is-touch .crt-bottom { display: none; }
+
+/* Pantalla completa (Fullscreen API sobre .av-player): fondo propio en vez
+   del ::backdrop negro, y el reproductor centrado sin márgenes de página. */
+.av-player:fullscreen {
+  max-width: none;
+  margin: 0;
+  padding: 16px max(24px, calc((100vw - 1100px) / 2));
+  background: var(--bg);
+  overflow-y: auto;
+}
+.av-player.is-touch:fullscreen { padding: 10px 16px; }
+
+/* Con el reproductor tapando toda la pantalla (pantalla completa, o modo juego
+   horizontal en táctil) el fondo animado del sitio no se ve, pero el
+   navegador lo seguía redibujando en cada frame: se apaga. */
+body:has(.av-player:fullscreen) .av-bg,
+body:has(.av-player:fullscreen) .av-noise { display: none; }
+@media (pointer: coarse) and (orientation: landscape) {
+  body:has(.av-player.is-touch) .av-bg,
+  body:has(.av-player.is-touch) .av-noise { display: none; }
+}
+
 
 /* Skin como desplegable (solo táctil): mismo lenguaje que los .btn del HUD. */
 .hud-skin-select {
