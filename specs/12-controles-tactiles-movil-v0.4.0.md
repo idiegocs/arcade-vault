@@ -199,6 +199,7 @@ Cada paso termina con algo que se puede abrir en la app y verificar. Los pasos 2
 
 **Proyecto**
 
+- [ ] En desktop, durante la partida, Espacio y las flechas no hacen scroll de la página ni activan el botón del HUD que tenga el foco.
 - [ ] Ningún archivo `components/games/*/*-engine.ts` ni `components/games/game-engine.ts` cambió (`git diff --stat`).
 - [ ] `npm run build` y `npm run lint` terminan sin errores.
 - [ ] `package.json` dice `0.4.0`, el Footer muestra `v0.4.0` y `CHANGELOG.md` tiene la entrada `0.4.0` enlazando a este spec.
@@ -232,6 +233,8 @@ Cada paso termina con algo que se puede abrir en la app y verificar. Los pasos 2
 - **Sí:** desplegable de skin e íconos en PAUSA/FIN/SALIR, solo en táctil (pedido del usuario al probarlo en su celular). Liberan el ancho que necesita el HUD en una sola fila en horizontal. Desktop se mantiene igual que en v0.3.0.
 - **Sí:** tamaños fluidos (`min(54px, calc((100vw - 112px) / 5.4))`) en lugar de tamaños fijos. Con tamaños fijos, el gamepad no entraba en celulares más angostos que 390px.
 - **Sí:** apagar el fondo animado del sitio (`.av-bg`, `.av-noise`) mientras el reproductor tapa toda la pantalla (pantalla completa o modo juego horizontal), y quitar el `mix-blend-mode: multiply` de las scanlines del CRT. El usuario notó el juego lento a pantalla completa en su celular. Los motores topan `dt` en 0,05 s, así que bajo 20 FPS el juego va en cámara lenta. Ambos efectos se redibujaban en cada frame sin verse, y el resultado visual es idéntico.
+- **Sí:** mientras `phase === "playing"`, el shell cancela la acción por defecto de Espacio y flechas (listener en captura sobre `window`). Lo reportó el usuario durante la implementación: Espacio hacía scroll en ROCAS, SERPENTINA y BLOQUE BUSTER, y "presionaba" el botón con foco, por ejemplo alternando PANTALLA COMPLETA. Los motores siguen recibiendo la tecla, porque `preventDefault` no frena el evento.
+- **No:** cancelarlo también en pausa o en game over. Ahí Espacio sobre un botón con foco sigue sirviendo para navegar con teclado.
 - **Sí:** versión minor `0.3.0` → `0.4.0`. Es funcionalidad nueva visible al usuario, y sigue la convención de la v0.2.0 y la v0.3.0.
 
 ## Riesgos

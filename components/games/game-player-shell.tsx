@@ -26,6 +26,10 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const INITIAL_STATE: EngineState = { score: 0, lives: 3, level: 1, phase: "playing" };
 
+/** Teclas de juego cuya acción por defecto del navegador se cancela durante
+ * la partida (ver el efecto en `GamePlayerShell`). */
+const GAME_KEYS = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+
 const COARSE_POINTER = "(pointer: coarse)";
 
 function subscribeCoarsePointer(onChange: () => void) {
@@ -137,6 +141,22 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     [gameId]
   );
 
+  // Vibración (spec 12): corta al perder una vida, patrón largo al game over.
+  // Si la última vida se pierde junto con el game over, solo suena el largo.
+  // `navigator.vibrate` no existe en iOS: ahí no hace nada.
+  const prevLivesRef = useRef(state.lives);
+  const prevPhaseRef = useRef(state.phase);
+  useEffect(() => {
+    const vibrate = (pattern: number | number[]) => navigator.vibrate?.(pattern);
+    if (state.phase === "gameover" && prevPhaseRef.current !== "gameover") {
+      vibrate([100, 60, 100, 60, 300]);
+    } else if (state.lives < prevLivesRef.current) {
+      vibrate(150);
+    }
+    prevLivesRef.current = state.lives;
+    prevPhaseRef.current = state.phase;
+  }, [state.lives, state.phase]);
+
   // Pausa automática al ocultarse la pestaña (cambio de pestaña/app, celular
   // bloqueado), en todos los dispositivos. Nunca reanuda sola: al volver
   // queda EN PAUSA hasta tocar REANUDAR.
@@ -151,6 +171,20 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  // Mientras se juega, Espacio y flechas son del juego: se cancela su acción
+  // por defecto (scroll de la página, o "presionar" el botón con foco, p. ej.
+  // PANTALLA COMPLETA). En captura, antes que el botón con foco; los motores
+  // igual reciben la tecla, porque `preventDefault` no frena el evento.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (phaseRef.current !== "playing" || !GAME_KEYS.has(e.code)) return;
+      if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLInputElement) return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, []);
 
   // Guarda automáticamente al entrar a game over, una sola vez por partida.
