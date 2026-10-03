@@ -25,10 +25,12 @@
 - `components/games/game-player-shell.tsx`:
   - Ciclo de vida de la música según la partida: suena al jugar, se pausa en EN PAUSA (incluida la pausa automática), se detiene en game over y vuelve a empezar con JUGAR DE NUEVO.
   - Selector de pista (con la opción SIN MÚSICA) y slider de volumen.
-  - En desktop van en línea en el HUD. En táctil, un botón ♫ abre un panel que pausa el juego mientras está abierto.
+  - Junto con el selector de skin, van en un panel de ajustes que abre un ícono ⚙ del HUD, en desktop y en táctil. El panel pausa el juego mientras está abierto.
   - La pista elegida se recuerda por juego.
-- `app/globals.css`: estilos del control de música (en línea y panel ♫).
-- `app/globals.css` (ajuste pedido durante la implementación): en escritorio, el gabinete CRT limita su ancho según el alto de la ventana (`100dvh`), así la pantalla 4:3 entra entera sin scroll y se reajusta al cambiar el tamaño de la ventana. Lo mismo en pantalla completa.
+  - El selector de skin se mueve al panel ⚙ como desplegable, y PAUSA / FIN / PANTALLA COMPLETA / SALIR pasan a íconos (❚❚ ■ ⤢ ✕) también en desktop, como ya eran en táctil. Conservan su nombre en `aria-label` y `title`.
+- `app/globals.css`: estilos del panel de ajustes ⚙ y del vúmetro de volumen.
+- `app/globals.css` (ajuste pedido durante la implementación): en escritorio, el gabinete CRT limita su ancho según el alto de la ventana (`100dvh`), así la pantalla 4:3 entra entera sin scroll y se reajusta al cambiar el tamaño de la ventana. En pantalla completa la pantalla del juego toma el máximo posible: el reproductor ocupa toda la pantalla (sin el tope de 1100 px), el HUD arriba y la pantalla 4:3 usa todo el resto (ancho o alto, el que limite). En celular vertical, en pantalla completa todo entra sin scroll: HUD arriba, mandos pegados abajo y la pantalla 4:3 en el medio, ajustándose al espacio que queda.
+- `components/games/caida/tetris-engine.ts` (ajuste pedido durante la implementación): la pieza O deja de salir. Sigue definida en `PIECES`, porque los colores de cada skin se indexan por tipo, pero el sorteo usa solo `SPAWNABLE`. Es la única excepción a "no se tocan los motores".
 - `components/games/README.md`: documenta `music` y cómo agregar una pista al catálogo.
 - `package.json` / `package-lock.json`: version `0.4.0` → `0.5.0`.
 - `CHANGELOG.md`: entrada para `0.5.0` enlazando a este spec.
@@ -39,7 +41,7 @@
 - Música fuera del reproductor (home, catálogo, menús).
 - Los 4 juegos sin motor (mock estático).
 - Volumen propio para los efectos o un volumen general: el nuevo control es solo para la música.
-- Cualquier cambio en los motores (`*-engine.ts`) o en el contrato `game-engine.ts`.
+- Cualquier otro cambio en los motores (`*-engine.ts`) o en el contrato `game-engine.ts`, salvo quitar la pieza O de CAÍDA (ver arriba).
 - Música que reacciona al juego (tempo según nivel, cambios por eventos), crossfade entre pistas y jingles de game over o subida de nivel.
 - Editor o importación de pistas por el usuario.
 
@@ -163,16 +165,16 @@ Cada paso termina con algo que se puede abrir en la app y escuchar o ver. Los pa
 
 3. **Catálogo completo:** componer `orbita`, `turbo` y `jardin` en `music-tracks.ts`, y declarar `music` en ROCAS, BLOQUE BUSTER y SERPENTINA según la tabla. Prueba manual: cada uno de los 4 juegos tiene su propia música y todas cierran el bucle sin cortes ni desfase.
 4. **Controles en desktop:**
-   - En el HUD, un desplegable de pista (las 4 + SIN MÚSICA) y un slider de volumen de 0 a 100 en pasos de 10 (diseñados con `/frontend-design`, con la estética del HUD).
+   - Un desplegable de pista (las 4 + SIN MÚSICA) y un slider de volumen de 0 a 100 en pasos de 10 (diseñados con `/frontend-design`, con la estética del HUD). Van en el panel de ajustes ⚙ (ver paso 5).
    - Pista por juego en `av-music:<gameId>`, leída en el efecto que crea el motor (nunca en el render, por la hidratación).
 
    Prueba manual: cambiar de pista en plena partida cambia la música al instante. SIN MÚSICA la calla. Mover el slider cambia el volumen en vivo, y en 0 no suena. Al recargar, se recuerdan la pista de ese juego y el volumen.
 
 5. **Controles en táctil:**
-   - En táctil, en vez de los controles en línea, un ícono ♫ junto a ❚❚ ■ ⤢ ✕ que abre un panel con el mismo desplegable y slider.
+   - Un ícono ⚙ junto a ❚❚ ■ ⤢ ✕, en táctil y en desktop, abre un panel de ajustes con la skin y la música (pista y volumen). En el HUD ya no quedan controles de skin ni de música en línea.
    - Abrir el panel pausa el juego si estaba corriendo. Al cerrarlo, se reanuda solo si lo pausó el panel.
 
-   Prueba manual: en DevTools modo dispositivo, en vertical y en horizontal, ♫ abre el panel sobre el juego, se puede cambiar pista y volumen con el dedo, y al cerrarlo el juego sigue. Ningún control se sale de pantalla.
+   Prueba manual: en desktop y en DevTools modo dispositivo, en vertical y en horizontal, ⚙ abre el panel sobre el juego, se puede cambiar la skin, se puede cambiar pista y volumen con el dedo, y al cerrarlo el juego sigue. Ningún control se sale de pantalla.
 
 6. **Documentación y versión:**
    - `components/games/README.md`: describir `music` en la receta para agregar un juego y cómo componer y agregar una pista al catálogo (notas MIDI, voces de igual duración).
@@ -202,20 +204,21 @@ Cada paso termina con algo que se puede abrir en la app y escuchar o ver. Los pa
 
 ### Controles
 
-- [ ] En desktop, el HUD muestra un desplegable con BLOQUES, ÓRBITA, TURBO, JARDÍN y SIN MÚSICA, más un slider de volumen de 0 a 100 en pasos de 10.
+- [ ] El panel ⚙ muestra un desplegable con BLOQUES, ÓRBITA, TURBO, JARDÍN y SIN MÚSICA, más un slider de volumen de 0 a 100 en pasos de 10.
 - [ ] Cambiar de pista en plena partida cambia la música al instante, sin reiniciar la partida ni tocar puntaje o vidas.
 - [ ] Elegir SIN MÚSICA la calla, y volver a elegir una pista la hace sonar otra vez.
 - [ ] Mover el slider cambia el volumen en vivo, y en 0 no se oye nada.
 - [ ] Al recargar la página se recuerdan el volumen (global) y la pista elegida para ese juego. Cada juego recuerda su propia pista.
 - [ ] Con ♪ OFF en el nav, ni la música ni los efectos suenan. Con ♪ ON, la música vuelve al volumen elegido sin reiniciar la pista.
-- [ ] En táctil, el ícono ♫ abre un panel con el desplegable y el slider, operables con el dedo, en vertical y en horizontal, sin que nada se salga de pantalla.
-- [ ] En táctil, abrir el panel ♫ pausa la partida. Al cerrarlo, la partida se reanuda solo si la había pausado el panel; si ya estaba en pausa, sigue en pausa.
+- [ ] El HUD no muestra controles de skin ni de música en línea, solo el ícono ⚙. En táctil, el panel es operable con el dedo, en vertical y en horizontal, sin que nada se salga de pantalla. En desktop se cierra también con Esc.
+- [ ] Abrir el panel ⚙ pausa la partida. Al cerrarlo, la partida se reanuda solo si la había pausado el panel; si ya estaba en pausa, sigue en pausa.
 - [ ] La consola no muestra errores de hidratación ni de audio al cargar el reproductor en móvil o desktop.
 - [ ] En escritorio (1280×620, 1366×657, 1536×730, 1920×950), el gabinete CRT entra entero en la ventana sin hacer scroll, también en pantalla completa. Al agrandar o achicar la ventana se reajusta sin recargar.
 
 ### Proyecto
 
-- [ ] Ningún archivo `components/games/*/*-engine.ts` ni `components/games/game-engine.ts` cambió (`git diff --stat`).
+- [ ] Ningún archivo `components/games/*/*-engine.ts` ni `components/games/game-engine.ts` cambió (`git diff --stat`), salvo `caida/tetris-engine.ts` por la pieza O.
+- [ ] En CAÍDA no sale nunca la pieza O (cuadrado 2×2) durante varias partidas, y las skins siguen pintando bien todas las piezas.
 - [ ] `npx tsc --noEmit`, `npm run lint` y `npm run build` terminan sin errores.
 - [ ] `package.json` y `package-lock.json` dicen `0.5.0`, el Footer muestra `v0.5.0` y `CHANGELOG.md` tiene la entrada `0.5.0` enlazando a este spec.
 - [ ] `components/games/README.md` documenta `music` y cómo agregar una pista.
@@ -235,9 +238,11 @@ Cada paso termina con algo que se puede abrir en la app y escuchar o ver. Los pa
 - **Sí:** secuenciador con lookahead sobre `audioCtx.currentTime`, en lugar de agendar notas desde el `requestAnimationFrame` del juego. El tempo queda estable aunque el juego baje de FPS (el problema de rendimiento del spec 12).
 - **Sí:** reusar el `AudioContext` de `audio.ts` y pausar dejando de agendar notas, no suspendiendo el contexto. Un solo contexto por página, y pausar la música no apaga los efectos.
 - **Sí:** arrancar con el primer gesto, sin forzar el autoplay. Los navegadores bloquean el audio sin un gesto del usuario, y el primer `keydown` o toque ya reanuda el contexto.
-- **Sí:** en táctil, un botón ♫ con panel. En desktop, los controles van en línea. El HUD táctil ya va justo de espacio, sobre todo en horizontal.
-- **Sí:** el panel ♫ pausa la partida al abrirse y la reanuda al cerrarse solo si fue él quien la pausó. Cambiar de música con el dedo en plena partida haría perder una vida. Si el jugador ya estaba en pausa, cerrar el panel no debe reanudar por sorpresa.
+- **Sí:** skin y música detrás de un solo ícono ⚙ con panel, en desktop y en táctil. El usuario lo pidió durante la implementación: con los controles en línea (y un ♫ aparte en táctil) el HUD tenía demasiados controles. Así el HUD queda igual en todos los dispositivos: datos de la partida y ⚙ ❚❚ ■ ⤢ ✕.
+- **Sí:** el panel ⚙ pausa la partida al abrirse y la reanuda al cerrarse solo si fue él quien la pausó. Cambiar de música con el dedo en plena partida haría perder una vida. Si el jugador ya estaba en pausa, cerrar el panel no debe reanudar por sorpresa.
 - **Sí:** ajustar el reproductor de escritorio al alto de la ventana en este spec, aunque no es música. El usuario lo pidió durante la implementación: el canvas medía siempre unos 753 px de alto y obligaba a hacer scroll en ventanas típicas. Es solo CSS (`max-width` del `.crt` calculado con `100dvh`).
+- **Sí:** quitar la pieza O del sorteo de CAÍDA en este spec, aunque no es música y toca un motor. El usuario lo pidió durante la implementación. Se deja en `PIECES` (en lugar de borrarla) para no correr los índices de color de las skins.
+- **Sí:** íconos en las acciones del HUD también en desktop (❚❚ ■ ⤢ ✕), como ya eran en táctil. Conservan su nombre en `aria-label` y `title`.
 - **Sí:** implementar después de mergear el spec 12, en una rama nueva desde `master`. Este spec depende del HUD táctil.
 - **Sí:** versión minor `0.4.0` → `0.5.0`. Es funcionalidad nueva visible al usuario, con el mismo criterio que la v0.3.0 y la v0.4.0.
 
@@ -260,7 +265,7 @@ Cada paso termina con algo que se puede abrir en la app y escuchar o ver. Los pa
 - Música fuera del reproductor (home, catálogo, menús).
 - Música para los 4 juegos sin motor.
 - Volumen propio para los efectos o un volumen general.
-- Cambios en los motores o en `game-engine.ts`.
+- Cambios en los motores o en `game-engine.ts` (salvo la pieza O de CAÍDA).
 - Música que reacciona al juego, crossfade y jingles.
 - Editor o importación de pistas.
 

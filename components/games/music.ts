@@ -10,7 +10,13 @@
  */
 
 import { getAudioContext, isMuted, onMuteChange } from "./audio";
-import { MUSIC_TRACKS, type MusicTrack, type TrackId } from "./music-tracks";
+import {
+  MUSIC_TRACKS,
+  TRACK_IDS,
+  type MusicChoice,
+  type MusicTrack,
+  type TrackId,
+} from "./music-tracks";
 
 const VOLUME_KEY = "arcade-vault:music-volume";
 const DEFAULT_VOLUME = 30;
@@ -242,6 +248,32 @@ export function resumeMusic(): void {
 export function stopMusic(): void {
   halt();
   paused = null;
+}
+
+const CHOICE_PREFIX = "av-music:";
+
+function isMusicChoice(value: unknown): value is MusicChoice {
+  return value === "none" || (TRACK_IDS as readonly unknown[]).includes(value);
+}
+
+/** Pista elegida para un juego (`av-music:<gameId>`), o `fallback` (su
+ * `music` del registro) si no hay una válida guardada. Leer solo en el
+ * cliente, después de hidratar. */
+export function getSavedMusic(gameId: string, fallback: MusicChoice): MusicChoice {
+  try {
+    const value = localStorage.getItem(CHOICE_PREFIX + gameId);
+    return isMusicChoice(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function saveMusic(gameId: string, choice: MusicChoice): void {
+  try {
+    localStorage.setItem(CHOICE_PREFIX + gameId, choice);
+  } catch {
+    // localStorage bloqueado: la elección vale solo para esta sesión.
+  }
 }
 
 export function getMusicVolume(): number {
