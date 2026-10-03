@@ -11,6 +11,7 @@ import {
   type EngineState,
   type SkinId,
 } from "./game-engine";
+import { pauseMusic, playTrack, resumeMusic, stopMusic } from "./music";
 import { GAME_ENGINES } from "./registry";
 import { getSavedSkin, saveSkin, SKIN_LABELS } from "./skins";
 import { TouchGamepad } from "./touch-gamepad";
@@ -117,12 +118,16 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
       setSkin(initialSkin);
       setReady(true);
       handle.start();
+      // Música de fondo (spec 13). Antes del primer gesto el AudioContext
+      // está suspendido: arranca sola con la primera tecla o toque.
+      if (registration.music) playTrack(registration.music);
     });
 
     return () => {
       cancelled = true;
       handle?.destroy();
       engineRef.current = null;
+      stopMusic();
     };
   }, [gameId]);
 
@@ -140,6 +145,21 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
     },
     [gameId]
   );
+
+  // Música según la partida (spec 13): se pausa con la pausa (también la
+  // automática), se detiene en game over y arranca desde el inicio al
+  // reiniciar. El primer `playTrack` lo hace el efecto que crea el motor.
+  const music = GAME_ENGINES[gameId]?.music;
+  const musicPhaseRef = useRef(state.phase);
+  useEffect(() => {
+    const prev = musicPhaseRef.current;
+    musicPhaseRef.current = state.phase;
+    if (!music || prev === state.phase) return;
+    if (state.phase === "paused") pauseMusic();
+    else if (state.phase === "gameover") stopMusic();
+    else if (prev === "paused") resumeMusic();
+    else playTrack(music); // gameover → playing: JUGAR DE NUEVO
+  }, [state.phase, music]);
 
   // Vibración (spec 12): corta al perder una vida, patrón largo al game over.
   // Si la última vida se pierde junto con el game over, solo suena el largo.

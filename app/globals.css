@@ -703,6 +703,19 @@ a { color: inherit; text-decoration: none; }
   background: var(--green); box-shadow: 0 0 6px var(--green);
 }
 
+/* Escritorio: el gabinete limita su ancho según el alto de la ventana, para
+   que la pantalla 4:3 entre entera sin scroll. 365px ≈ lo que ocupan nav,
+   HUD y bisel alrededor de la pantalla (sin nav en pantalla completa:
+   ~250px). Al cambiar el tamaño de la ventana se reajusta solo. (Ajuste
+   pedido en spec 13.) */
+.av-player:not(.is-touch) .crt {
+  max-width: max(400px, calc((100dvh - 365px) * 4 / 3 + 48px));
+  margin-inline: auto;
+}
+.av-player:not(.is-touch):fullscreen  .crt {
+  max-width: max(400px, calc((100dvh - 250px) * 4 / 3 + 48px));
+}
+
 /* ===== touch gamepad (spec 12) ===== */
 /* La zona de juego no hace scroll, zoom, selección ni menú de mantener
    apretado: cada toque ahí es input del juego. Solo aquí, no en todo el sitio. */
