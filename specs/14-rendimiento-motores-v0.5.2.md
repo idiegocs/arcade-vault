@@ -384,7 +384,8 @@ No hace falta tocar nada más, porque los motores ya traían las guardas:
 8. **Headless para medir, y verificación objetiva.** Una ventana visible tapada por otra frenó el rAF y arruinó una corrida (CAÍDA a 1 FPS). Para el comportamiento, contar las llamadas a `drawImage` (0 tras el game over) fue más confiable que mirar capturas.
 9. **Las capturas de comparación, sin mover al jugador.** Con el bot moviendo la rana, la partida terminó y el modal tapó el canvas. Las capturas de fidelidad se sacan en un estado estable (recién cargado), y "antes" se obtiene con `git stash` del motor.
 10. **Acotar el alcance a tiempo.** Hacer un juego completo, medido y documentado, deja una receta probada para los otros 4. Hacer los 5 a medias no la deja.
-11. **Cuidado con los hooks de formato.** El hook `format-on-write` aplicó `prefer-const` sobre un `let` cuya reasignación todavía no existía y rompió el typecheck. Correr `tsc` después de cada edición en varios pasos.
+11. **Para probar estados raros (bocas llenas, nivel nuevo), un bot por píxeles alcanza, si se compara contra el motor anterior.** Sin un hook de test en el motor, el bot que lee el canvas verificó las bocas al frame. Que nunca juntara 5 bocas se descartó como regresión corriéndolo igual contra el motor viejo (`git checkout <commit> -- <motor>`).
+12. **Cuidado con los hooks de formato.** El hook `format-on-write` aplicó `prefer-const` sobre un `let` cuya reasignación todavía no existía y rompió el typecheck. Correr `tsc` después de cada edición en varios pasos.
 
 ## Criterios de aceptación
 
@@ -405,13 +406,15 @@ No hace falta tocar nada más, porque los motores ya traían las guardas:
 - [x] JUGAR DE NUEVO, tras el game over, arranca la partida normal (el canvas vuelve a animarse).
 - [x] Cambiar de skin en vivo y en pausa actualiza el canvas al instante, sin restos de la skin anterior (los cachés se regeneran).
 - [ ] Nivel nuevo y bocas llenas se reflejan en el siguiente frame.
+  - **Bocas llenas: verificado.** Un bot que lee los píxeles del canvas llenó 18 bocas, y cada una se vio en el frame siguiente al aterrizaje: 131–138 ms después de apretar la tecla, con un salto de 120 ms.
+  - **Nivel nuevo: pendiente, a verificar jugando.** El bot no consigue llenar más de una boca por partida, y con el motor anterior le pasa lo mismo, así que no es una regresión. Por código, `completeRound()` regenera los carriles. Los sprites dependen solo de `LANE_SPECS` y de la skin, y las bocas se dibujan por frame desde `goalsFilled`, así que no hay caché que invalidar.
 - [x] En `/juegos/ranaria/jugar`, la grilla de fondo de la página no se anima. En `/` y en `/games` sí.
 
 **Fidelidad**
 
 - [x] Las capturas antes y después de cada skin están en `.playwright-screenshot/`, comparadas a la par, y cada skin es visualmente equivalente. El glow no aparece recortado.
 - [ ] Gameplay, puntuación, velocidades y sonidos no cambian. Una partida jugada con sesión iniciada se guarda y aparece en `/juegos/ranaria` y en `/salon-de-la-fama`.
-- [ ] Los controles táctiles (viewport de celular) siguen funcionando en RANARIA.
+- [x] Los controles táctiles (viewport de celular) siguen funcionando en RANARIA. _(Verificado con Playwright con touch en 390×844 y 844×390: ◀ y ▲ mueven la rana una fila. Capturas: `.playwright-screenshot/spec14-ranaria-touch-*.png`.)_
 
 **Higiene**
 
