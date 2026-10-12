@@ -329,6 +329,34 @@ módulos, variables globales, arranque inmediato). Pasos, en orden:
 - No valida ni conoce la sesión del usuario, ni llama a `saveScore` — eso lo
   hace el shell cuando `phase` pasa a `"gameover"`.
 
+## 5b. Rendimiento (spec 14): reglas de dibujo obligatorias
+
+Referencia: `components/games/ranaria/frogger-engine.ts`. Detalle, receta y
+lecciones en `specs/14-rendimiento-motores-v0.5.2.md` ("Bitácora de
+soluciones" y "Lecciones aprendidas"). Mismas reglas que la sección
+"Rendimiento" de `components/games/README.md`:
+
+- **Loop:** tras `update(dt); draw();`, si la fase interna es `"gameover"`
+  → `rafId = null; return;`. El canvas queda congelado detrás del modal, y
+  `restart()` lo rearma.
+- **`bgCache`:** el fondo estático (zonas, grilla, marco, degradado) se
+  pinta una vez en un `<canvas>` offscreen y se dibuja con un `drawImage`
+  por frame.
+- **Sprites para todo lo que brilla:** nunca `shadowBlur` por frame. Se
+  pre-renderiza por skin/tipo/color en un `<canvas>` de
+  `tamaño + 2 × pad` (`pad = ceil(glow × 1,5) + 2`), y se pinta en
+  `Math.round(x) - pad`.
+- **Helpers `drawX(c, …)`** con el contexto como parámetro y coordenadas
+  locales, para que el mismo código sirva al sprite y al canvas.
+- **`draw()` sin allocaciones:** sin closures, literales, `forEach`/`filter`
+  ni claves `string` por frame. Las referencias se resuelven en
+  `buildCaches()`.
+- **`invalidateCaches()`** como único punto de invalidación, llamado desde
+  `setSkin` y `destroy` (y desde cualquier evento que cambie lo cacheado).
+- **Un solo `clip`** por frame por región.
+- Si el estado solo avanza por tick o input (tipo Tetris/Snake), conviene un
+  flag `dirty` para saltar `draw()` cuando nada cambió.
+
 ## 6. Gotchas que rompen cosas si se ignoran
 
 - **`saveScore(gameId, score)` rechaza el guardado si `score` no es un

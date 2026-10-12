@@ -105,17 +105,17 @@ Cada paso deja el sistema funcional y **se puede probar en el navegador** (`npm 
 2. ✅ **Fondo de la página quieto mientras se juega** (`app/globals.css`). _Hecho (commit `7a03ab1`)._
    - `body:has(.av-player) .av-bg::before { animation: none; }`.
    - _Prueba:_ en `/juegos/ranaria/jugar` la grilla del fondo no se mueve; en `/` sí. Se compara contra la línea base.
-3. ✅ **Canvas congelado tras el game over** (`ranaria/frogger-engine.ts`). _Hecho._
+3. ✅ **Canvas congelado tras el game over** (`ranaria/frogger-engine.ts`). _Hecho (commit `25811ad`)._
    - En `loop`, después de `update` y `draw`, si `internalPhase === "gameover"` no se pide otro rAF (`rafId = null`).
    - `restart()` ya rearma el rAF si `rafId === null`. `setSkin` ya redibuja si no hay rAF.
    - _Prueba:_ FIN → el canvas queda quieto detrás del modal, JUGAR DE NUEVO arranca normal y cambiar de skin sin rAF corriendo redibuja.
-4. ✅ **Cachés de dibujo de RANARIA** (`ranaria/frogger-engine.ts`). _Hecho._
+4. ✅ **Cachés de dibujo de RANARIA** (`ranaria/frogger-engine.ts`). _Hecho (commit `25811ad`)._
    - `bgCache` con las zonas, el oleaje, las líneas de carril, los límites, el marco y las bocas vacías. Las ranas en bocas llenas se siguen dibujando aparte.
    - Sprites por skin para coche (color × ancho × dirección), camión (dirección), tronco (ancho), tortuga (normal y sumergida), rana (dirección × saltando) y barra de tiempo (3 colores).
    - Un solo `clip` para entidades y rana.
    - Sin closures, arrays temporales ni objetos literales en `draw`.
    - _Prueba:_ las 3 skins se ven equivalentes a las capturas previas (`.playwright-screenshot/`), y el trabajo por frame baja frente a la línea base, sobre todo en NEÓN.
-5. **Documentación y versión.**
+5. ✅ **Documentación y versión.** _Hecho._
    - Sección "Rendimiento" en `components/games/README.md` y las mismas reglas en `.claude/skills/add-game/motor-referencia.md`.
    - Medición final de RANARIA × 3 skins anotada en "Mediciones", junto a la línea base.
    - Bump `0.5.1` → `0.5.2` en `package.json` y `package-lock.json`, más la entrada en `CHANGELOG.md`.
@@ -161,9 +161,21 @@ Lectura: con GPU, RANARIA anda holgada en esta PC. Sin GPU + CPU 4x, NEÓN ocupa
 
 Lectura: en NEÓN sin GPU + CPU 4x, el trabajo por frame bajó de **16,13 a 2,99 ms (−81 %)**, el hilo pasó del 95 % al 18 % ocupado, y el peor frame bajó de 33,5 a 16,8 ms (ya no se pierden frames). Las 3 skins quedaron con el mismo costo: el glow ya no se paga por frame.
 
-### Final (paso 5)
+### Final (paso 5, 2026-10-12)
 
-_Pendiente: se repite la medición después de la documentación y el bump, para confirmar._
+| Skin    | Escritorio (GPU, 1x) | CPU 4x (GPU)        | Sin GPU, 1x      | Sin GPU + CPU 4x     |
+| ------- | -------------------- | ------------------- | ---------------- | -------------------- |
+| clasico | 160 / 6,8 / 0,30     | 159,2 / 18,8 / 1,10 | 60 / 16,8 / 0,70 | 60 / 16,8 / **2,81** |
+| neon    | 160 / 6,7 / 0,30     | 159,4 / 25 / 1,10   | 60 / 16,8 / 0,75 | 60 / 16,8 / **3,14** |
+| retro   | 160 / 6,7 / 0,32     | 159,3 / 24,9 / 1,09 | 60 / 16,8 / 0,66 | 60 / 16,8 / **2,85** |
+
+Contra la línea base, en NEÓN sin GPU + CPU 4x:
+
+- el trabajo por frame bajó de **16,13 a 3,14 ms (−80,5 %)**;
+- el FPS subió de 58,9 a 60;
+- el peor frame bajó de 33,5 a 16,8 ms.
+
+En escritorio con GPU, el trabajo por frame bajó entre un 25 % y un 42 % según la skin. Las diferencias con la tabla de los pasos 3–4 son ruido entre corridas: el código del motor es el mismo.
 
 ## Bitácora de soluciones (receta para re-ejecutar en otros juegos)
 
@@ -378,35 +390,35 @@ No hace falta tocar nada más, porque los motores ya traían las guardas:
 
 **Medición**
 
-- [ ] El contador de FPS se ve en `npm run dev` y **no** aparece en `npm run build && npm start`.
-- [ ] Con React DevTools ("Highlight updates"), el contador no re-renderiza `GamePlayerShell` (se actualiza por ref).
-- [ ] La sección "Mediciones" tiene la tabla de línea base (paso 1) y la final (paso 5) para RANARIA × 3 skins: FPS promedio, peor frame y ms de trabajo por frame, en las condiciones del "Método".
+- [x] El contador de FPS se ve en `npm run dev` y **no** aparece en `npm run build && npm start`. _(Verificado: `[data-fps-meter]` da 1 en :3000 (dev) y 0 con `next start` en :3100.)_
+- [ ] Con React DevTools ("Highlight updates"), el contador no re-renderiza `GamePlayerShell` (se actualiza por ref). _(Por construcción: no hay `setState`, solo `textContent` sobre un ref. Falta la verificación manual con DevTools.)_
+- [x] La sección "Mediciones" tiene la tabla de línea base (paso 1) y la final (paso 5) para RANARIA × 3 skins: FPS promedio, peor frame y ms de trabajo por frame, en las condiciones del "Método".
 
 **Rendimiento**
 
-- [ ] En escritorio, con ventana normal y sin throttling, RANARIA promedia ≥ 58 FPS en las 3 skins en 30 s de juego, con un peor frame < 33 ms.
-- [ ] En la condición **sin GPU + CPU 4x**, los **ms de trabajo por frame** de RANARIA en NEÓN bajan al menos un 25 % frente a su línea base, y el FPS no baja. (Reemplaza al criterio original de "+25 % de FPS con CPU 4x"; ver "Mediciones → Método".)
-- [ ] Tras el game over, el motor no dibuja más: 0 frames del rAF del motor en 3 s.
+- [x] En escritorio, con ventana normal y sin throttling, RANARIA promedia ≥ 58 FPS en las 3 skins en 30 s de juego, con un peor frame < 33 ms.
+- [x] En la condición **sin GPU + CPU 4x**, los **ms de trabajo por frame** de RANARIA en NEÓN bajan al menos un 25 % frente a su línea base, y el FPS no baja. (Reemplaza al criterio original de "+25 % de FPS con CPU 4x"; ver "Mediciones → Método".)
+- [x] Tras el game over, el motor no dibuja más: 0 frames del rAF del motor en 3 s. _(Verificado con 0 `drawImage` sobre el canvas del juego en 1,5 s tras FIN.)_
 
 **Comportamiento**
 
-- [ ] JUGAR DE NUEVO, tras el game over, arranca la partida normal (el canvas vuelve a animarse).
-- [ ] Cambiar de skin en vivo y en pausa actualiza el canvas al instante, sin restos de la skin anterior (los cachés se regeneran).
+- [x] JUGAR DE NUEVO, tras el game over, arranca la partida normal (el canvas vuelve a animarse).
+- [x] Cambiar de skin en vivo y en pausa actualiza el canvas al instante, sin restos de la skin anterior (los cachés se regeneran).
 - [ ] Nivel nuevo y bocas llenas se reflejan en el siguiente frame.
-- [ ] En `/juegos/ranaria/jugar`, la grilla de fondo de la página no se anima. En `/` y en `/games` sí.
+- [x] En `/juegos/ranaria/jugar`, la grilla de fondo de la página no se anima. En `/` y en `/games` sí.
 
 **Fidelidad**
 
-- [ ] Las capturas antes y después de cada skin están en `.playwright-screenshot/`, comparadas a la par, y cada skin es visualmente equivalente. El glow no aparece recortado.
+- [x] Las capturas antes y después de cada skin están en `.playwright-screenshot/`, comparadas a la par, y cada skin es visualmente equivalente. El glow no aparece recortado.
 - [ ] Gameplay, puntuación, velocidades y sonidos no cambian. Una partida jugada con sesión iniciada se guarda y aparece en `/juegos/ranaria` y en `/salon-de-la-fama`.
 - [ ] Los controles táctiles (viewport de celular) siguen funcionando en RANARIA.
 
 **Higiene**
 
-- [ ] `npm run lint` y `npm run build` pasan sin errores.
-- [ ] No se modificaron `components/games/game-engine.ts` ni `app/actions/scores.ts`.
-- [ ] `components/games/README.md` y `.claude/skills/add-game/motor-referencia.md` tienen la sección "Rendimiento".
-- [ ] `package.json` y `package-lock.json` están en `0.5.2`, y `CHANGELOG.md` tiene la entrada `[0.5.2]` con link a este spec.
+- [x] `npm run lint` y `npm run build` pasan sin errores.
+- [x] No se modificaron `components/games/game-engine.ts` ni `app/actions/scores.ts`.
+- [x] `components/games/README.md` y `.claude/skills/add-game/motor-referencia.md` tienen la sección "Rendimiento".
+- [x] `package.json` y `package-lock.json` están en `0.5.2`, y `CHANGELOG.md` tiene la entrada `[0.5.2]` con link a este spec.
 
 ## Decisiones
 

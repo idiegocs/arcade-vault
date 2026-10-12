@@ -179,6 +179,43 @@ velocidades, spawn, puntaje, controles ni sonidos. En NEÓN, resetear
 entidades comparten tono, distinguirlas por patrón o borde (CAÍDA usa
 marcas interiores: punto, cuadro, franja, cruz).
 
+## Rendimiento
+
+Reglas de dibujo para todo motor (spec 14,
+`specs/14-rendimiento-motores-v0.5.2.md`). **RANARIA**
+(`ranaria/frogger-engine.ts`) es la referencia. El spec trae además la
+bitácora con la receta paso a paso, el script de medición y las lecciones
+aprendidas.
+
+1. **Canvas congelado tras el game over:** en `loop`, después de
+   `update(dt); draw();`, si la fase interna es `"gameover"`, se hace
+   `rafId = null` y no se pide otro frame. `endGame()`, `restart()` y
+   `setSkin` ya cubren el caso `rafId === null` con sus guardas.
+2. **Fondo estático cacheado:** todo lo que no cambia entre frames (fondo,
+   zonas, grilla, marco) se pinta una vez en un `<canvas>` offscreen
+   (`bgCache`), y cada frame hace un solo `drawImage`.
+3. **Glow en sprites, nunca `shadowBlur` por frame:** cada entidad que
+   brilla se pre-renderiza una vez por skin/tipo/color en un `<canvas>` con
+   margen `pad = ceil(glow × 1,5) + 2`, y se pinta con
+   `drawImage(sprite, Math.round(x) - pad, Math.round(y) - pad)`.
+   Redondear la posición mantiene los bordes duros de RETRO.
+4. **Helpers con el contexto como parámetro**, en coordenadas locales:
+   `drawX(c, …)` dibuja igual en el sprite que en el canvas, así cachear no
+   obliga a reescribir el look de las skins.
+5. **Sin allocaciones en `draw()`:** nada de closures, arrays/objetos
+   literales, `forEach`/`filter`, ni claves `string` armadas por frame. Las
+   referencias a sprites se resuelven una vez en `buildCaches()`.
+6. **Un solo punto de invalidación**, `invalidateCaches()`, llamado desde
+   `setSkin` (antes del redibujo) y `destroy`. Si algo más cambia lo
+   cacheado (nivel nuevo, bloque roto), también lo llama, o eso se dibuja
+   aparte por frame.
+7. **Un solo `clip`** por frame para todo lo que se recorta a la misma
+   región.
+
+**Cómo medir:** con el contador de FPS de dev (esquina del CRT). En una PC
+potente el FPS se satura: el número que discrimina es el de **ms de trabajo
+por frame sin GPU + CPU 4x** (ver "Mediciones → Método" en el spec 14).
+
 **Nota para motores con controles de puntero:** el canvas se escala por CSS
 a 100% de `.crt-screen`, pero su resolución interna sigue siendo fija
 (`ARENA_WIDTH × ARENA_HEIGHT`). Un motor que use posición de mouse/touch
