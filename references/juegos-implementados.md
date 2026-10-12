@@ -12,7 +12,7 @@ cada vez que se agregue o elimine un juego** — ver la regla en `CLAUDE.md`.
 | `serpentina`   | SERPENTINA   | ARCADE    | ✅ Snake — `components/games/serpentina/snake-engine.ts`             | 10   |
 | `gloton`       | GLOTÓN       | ARCADE    | ❌ sin motor — mock estático (`app/juegos/[id]/jugar/page.tsx`)      | —    |
 | `invasores`    | INVASORES    | SHOOTER   | ❌ sin motor — mock estático                                        | —    |
-| `ranaria`      | RANARIA      | ARCADE    | ❌ sin motor — mock estático                                        | —    |
+| `ranaria`      | RANARIA      | ARCADE    | ✅ Frogger — `components/games/ranaria/frogger-engine.ts`           | game-jam/03 |
 | `duelo-pixel`  | DUELO PIXEL  | VERSUS    | ❌ sin motor — mock estático                                        | —    |
 
 Cada entrada de `components/games/registry.ts` declara también el

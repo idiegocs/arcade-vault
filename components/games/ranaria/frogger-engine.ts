@@ -52,11 +52,28 @@ const COLORS = {
   safe: "#1a3d1a",
   road: "#111",
   laneMark: "rgba(255,255,255,0.25)",
+  cars: ["#ef4444", "#facc15", "#3b82f6", "#f97316"],
+  wheel: "#222",
+  window: "rgba(255,255,255,0.6)",
+  truck: "#9ca3af",
+  truckCab: "#6b7280",
+  log: "#8b5a2b",
+  logGrain: "#5c3a1a",
+  turtle: "#16a34a",
+  turtleShell: "#14532d",
+  turtleSubmerged: "rgba(74,222,128,0.35)",
   frog: "#4ade80",
   frogDark: "#15803d",
   eyeWhite: "#fff",
   eyePupil: "#000",
 };
+
+/** Ciclo de inmersión de las tortugas: visibles 3s, sumergidas 1,5s. */
+const TURTLE_UP_S = 3;
+const TURTLE_DOWN_S = 1.5;
+const TURTLE_CYCLE_S = TURTLE_UP_S + TURTLE_DOWN_S;
+/** Cada nivel acelera todas las entidades un 15%. */
+const LEVEL_SPEEDUP = 1.15;
 
 type Direction = "up" | "down" | "left" | "right";
 
@@ -67,6 +84,8 @@ interface Entity {
   type: "car" | "truck" | "log" | "turtle";
   /** Solo tortugas: hundidas no sostienen a la rana. */
   submerged?: boolean;
+  /** Solo tortugas: segundos dentro del ciclo de inmersión. */
+  diveT?: number;
 }
 
 interface Lane {
@@ -75,6 +94,59 @@ interface Lane {
   speed: number;
   dir: 1 | -1;
   entities: Entity[];
+}
+
+/** Diseño de un carril en el nivel 1: `count` entidades de `width` celdas,
+ * repartidas a distancia constante (hueco ≥ 1 celda en todos). Velocidades
+ * en celdas/s: carretera 2,25–6, río 1,5–4,5 (spec, Modelo de datos). */
+type LaneSpec = {
+  row: number;
+  type: Entity["type"];
+  width: number;
+  count: number;
+  speed: number;
+  dir: 1 | -1;
+};
+
+const LANE_SPECS: LaneSpec[] = [
+  // Río (filas 1–6)
+  { row: 1, type: "log", width: 3, count: 3, speed: 2.2, dir: 1 },
+  { row: 2, type: "log", width: 2, count: 4, speed: 3.0, dir: -1 },
+  { row: 3, type: "log", width: 4, count: 3, speed: 1.5, dir: 1 },
+  { row: 4, type: "turtle", width: 2, count: 4, speed: 2.4, dir: -1 },
+  { row: 5, type: "log", width: 3, count: 3, speed: 2.0, dir: 1 },
+  { row: 6, type: "turtle", width: 3, count: 4, speed: 1.8, dir: -1 },
+  // Carretera (filas 8–12)
+  { row: 8, type: "truck", width: 3, count: 2, speed: 2.6, dir: -1 },
+  { row: 9, type: "car", width: 1, count: 2, speed: 6.0, dir: 1 },
+  { row: 10, type: "car", width: 2, count: 3, speed: 3.75, dir: -1 },
+  { row: 11, type: "car", width: 1, count: 3, speed: 3.0, dir: 1 },
+  { row: 12, type: "car", width: 1, count: 3, speed: 2.25, dir: -1 },
+];
+
+/** Largo del recorrido de wrap de una entidad: sale por un borde y reaparece
+ * por el otro manteniendo la distancia con las demás del carril. */
+function wrapSpan(width: number): number {
+  return COLS + width;
+}
+
+function buildLanes(level: number): Lane[] {
+  const factor = Math.pow(LEVEL_SPEEDUP, level - 1);
+  return LANE_SPECS.map((spec) => {
+    const span = wrapSpan(spec.width);
+    const spacing = span / spec.count;
+    const entities: Entity[] = [];
+    for (let i = 0; i < spec.count; i++) {
+      const entity: Entity = { col: i * spacing - spec.width, width: spec.width, type: spec.type };
+      if (spec.type === "turtle") {
+        // Desfasa los grupos para que no se hundan todos a la vez.
+        entity.diveT = (i * TURTLE_CYCLE_S) / spec.count;
+        entity.submerged = false;
+      }
+      entities.push(entity);
+    }
+    return { row: spec.row, speed: spec.speed * factor, dir: spec.dir, entities };
+  });
 }
 
 interface Frog {
@@ -126,7 +198,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     level = 1;
     internalPhase = "playing";
     isPaused = false;
-    lanes = [];
+    lanes = buildLanes(level);
     goalsFilled = GOAL_COLS.map(() => false);
     frog = makeFrog();
   }
@@ -156,11 +228,27 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
   }
 
   // ── Update ──────────────────────────────────────────────────────────
-  function update(_dt: number) {
+  function updateLanes(dt: number) {
+    for (const lane of lanes) {
+      for (const e of lane.entities) {
+        e.col += lane.speed * lane.dir * dt;
+        const span = wrapSpan(e.width);
+        if (lane.dir === 1 && e.col >= COLS) e.col -= span;
+        else if (lane.dir === -1 && e.col <= -e.width) e.col += span;
+        if (e.type === "turtle") {
+          e.diveT = ((e.diveT ?? 0) + dt) % TURTLE_CYCLE_S;
+          e.submerged = e.diveT >= TURTLE_UP_S;
+        }
+      }
+    }
+  }
+
+  function update(dt: number) {
     if (internalPhase === "gameover") {
       reportState();
       return;
     }
+    updateLanes(dt);
     reportState();
   }
 
@@ -199,6 +287,101 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       c.strokeRect(x + 1, 5, CELL * 2 - 2, CELL - 6);
       if (goalsFilled[i]) drawFrogAt(col + 0.5, ROW_GOALS, "down", false);
     });
+  }
+
+  function drawCar(x: number, y: number, w: number, color: string, dir: 1 | -1) {
+    const c = ctx!;
+    c.fillStyle = COLORS.wheel;
+    for (const wx of [x + 6, x + w - 14]) {
+      c.fillRect(wx, y + 4, 8, 6);
+      c.fillRect(wx, y + CELL - 10, 8, 6);
+    }
+    c.fillStyle = color;
+    c.fillRect(x + 2, y + 8, w - 4, CELL - 16);
+    // Parabrisas hacia el sentido de marcha
+    c.fillStyle = COLORS.window;
+    const wsX = dir === 1 ? x + w - 14 : x + 6;
+    c.fillRect(wsX, y + 12, 8, CELL - 24);
+  }
+
+  function drawTruck(x: number, y: number, w: number, dir: 1 | -1) {
+    const c = ctx!;
+    c.fillStyle = COLORS.wheel;
+    for (const wx of [x + 6, x + w / 2 - 4, x + w - 14]) {
+      c.fillRect(wx, y + 3, 8, 6);
+      c.fillRect(wx, y + CELL - 9, 8, 6);
+    }
+    const cabW = CELL - 8;
+    const cabX = dir === 1 ? x + w - cabW - 2 : x + 2;
+    const boxX = dir === 1 ? x + 2 : x + cabW + 4;
+    c.fillStyle = COLORS.truck;
+    c.fillRect(boxX, y + 6, w - cabW - 6, CELL - 12);
+    c.fillStyle = COLORS.truckCab;
+    c.fillRect(cabX, y + 8, cabW, CELL - 16);
+    c.fillStyle = COLORS.window;
+    c.fillRect(dir === 1 ? cabX + cabW - 10 : cabX + 2, y + 12, 8, CELL - 24);
+  }
+
+  function drawLog(x: number, y: number, w: number) {
+    const c = ctx!;
+    c.fillStyle = COLORS.log;
+    c.beginPath();
+    c.roundRect(x + 1, y + 5, w - 2, CELL - 10, 12);
+    c.fill();
+    c.strokeStyle = COLORS.logGrain;
+    c.lineWidth = 2;
+    for (const gy of [y + 14, y + CELL - 14]) {
+      c.beginPath();
+      c.moveTo(x + 12, gy);
+      c.lineTo(x + w - 12, gy);
+      c.stroke();
+    }
+  }
+
+  function drawTurtles(x: number, y: number, width: number, submerged: boolean) {
+    const c = ctx!;
+    for (let i = 0; i < width; i++) {
+      const cx = x + i * CELL + CELL / 2;
+      const cy = y + CELL / 2;
+      if (submerged) {
+        c.strokeStyle = COLORS.turtleSubmerged;
+        c.lineWidth = 2;
+        c.beginPath();
+        c.arc(cx, cy, 14, 0, Math.PI * 2);
+        c.stroke();
+        continue;
+      }
+      c.fillStyle = COLORS.turtle;
+      c.beginPath();
+      c.arc(cx, cy, 15, 0, Math.PI * 2);
+      c.fill();
+      // Escamas del caparazón
+      c.strokeStyle = COLORS.turtleShell;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(cx, cy, 8, 0, Math.PI * 2);
+      for (let k = 0; k < 6; k++) {
+        const a = (k * Math.PI) / 3;
+        c.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8);
+        c.lineTo(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15);
+      }
+      c.stroke();
+    }
+  }
+
+  function drawLanes() {
+    for (const lane of lanes) {
+      const y = lane.row * CELL;
+      lane.entities.forEach((e, i) => {
+        const x = e.col * CELL;
+        const w = e.width * CELL;
+        if (e.type === "car")
+          drawCar(x, y, w, COLORS.cars[(lane.row + i) % COLORS.cars.length], lane.dir);
+        else if (e.type === "truck") drawTruck(x, y, w, lane.dir);
+        else if (e.type === "log") drawLog(x, y, w);
+        else drawTurtles(x, y, e.width, !!e.submerged);
+      });
+    }
   }
 
   /** Dibuja una rana centrada en la celda (`col`, `row`). `col` puede ser
@@ -244,6 +427,13 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     c.save();
     c.translate(OFFSET_X, OFFSET_Y);
     drawZones();
+    // Las entidades que asoman por los bordes se recortan a la cuadrícula.
+    c.save();
+    c.beginPath();
+    c.rect(0, 0, GRID_W, GRID_H);
+    c.clip();
+    drawLanes();
+    c.restore();
     drawFrogAt(frog.col, frog.row, frog.facing, frog.animating);
     c.restore();
   }
