@@ -300,6 +300,18 @@ const DIR_DELTA: Record<Direction, { dc: number; dr: number }> = {
   right: { dc: 1, dr: 0 },
 };
 
+/** Orientaciones de la rana, en el orden de sus sprites (ver `FACING_INDEX`). */
+const FACINGS: readonly Direction[] = ["up", "right", "down", "left"];
+const FACING_INDEX: Record<Direction, number> = { up: 0, right: 1, down: 2, left: 3 };
+const FACING_ANGLE: Record<Direction, number> = {
+  up: 0,
+  right: Math.PI / 2,
+  down: Math.PI,
+  left: -Math.PI / 2,
+};
+/** Alto de la barra de tiempo, en la franja negra bajo la cuadrícula. */
+const TIME_BAR_H = 10;
+
 const DIRECTION_KEYS: Record<string, Direction> = {
   ArrowUp: "up",
   KeyW: "up",
@@ -405,7 +417,8 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
   if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
 
   /** Paleta activa — solo visual; `setSkin` la reasigna en vivo. */
-  let palette: FroggerPalette = SKINS[options?.skin ?? DEFAULT_SKIN] ?? SKINS[DEFAULT_SKIN];
+  let skinId: SkinId = options?.skin && SKINS[options.skin] ? options.skin : DEFAULT_SKIN;
+  let palette: FroggerPalette = SKINS[skinId];
 
   // ── Input ────────────────────────────────────────────────────────────
   /** Un único salto pendiente: el pedido durante una animación se ejecuta
@@ -684,10 +697,16 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
   // Todo color sale de `palette`. Cómo se pinta cada entidad depende de la
   // skin, no de `if`s sueltos: relleno plano (CLÁSICO), tubo de neón hueco
   // con glow (NEÓN) o relleno sólido con borde duro (RETRO) — ver `paint`.
+  //
+  // Rendimiento (spec 14): nada de eso se pinta por frame. El fondo estático
+  // (zonas, oleaje, carriles, límites, bocas vacías y marco) vive en
+  // `bgCache`, y cada entidad, la rana y la barra de tiempo se pre-renderizan
+  // una vez por skin en sprites con un margen de `pad` px para que el glow no
+  // se corte. `draw()` solo hace `drawImage`, sin allocar. `setSkin` los
+  // invalida (`invalidateCaches`) y se regeneran en el siguiente `draw()`.
 
   /** Pinta la figura que arma `path` con `color` según la skin activa. */
-  function paint(color: string, path: () => void) {
-    const c = ctx!;
+  function paint(c: CanvasRenderingContext2D, color: string, path: () => void) {
     const tube = palette.tube;
     c.beginPath();
     path();
@@ -719,19 +738,18 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
   }
 
   /** Activa el glow de la skin (si tiene) con `color`; `noGlow` lo apaga. */
-  function glowOn(color: string) {
+  function glowOn(c: CanvasRenderingContext2D, color: string) {
     if (palette.glow <= 0) return;
-    ctx!.shadowColor = color;
-    ctx!.shadowBlur = palette.glow;
+    c.shadowColor = color;
+    c.shadowBlur = palette.glow;
   }
 
-  function noGlow() {
-    ctx!.shadowBlur = 0;
+  function noGlow(c: CanvasRenderingContext2D) {
+    c.shadowBlur = 0;
   }
 
   /** Octógono de radio `r` (silueta de píxel para tortugas en RETRO). */
-  function octagonPath(cx: number, cy: number, r: number) {
-    const c = ctx!;
+  function octagonPath(c: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
     const k = r * 0.41;
     c.moveTo(cx - k, cy - r);
     c.lineTo(cx + k, cy - r);
@@ -751,29 +769,8 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
     return palette.road;
   }
 
-  /** Barra de tiempo en la franja negra bajo la cuadrícula (fuera del
-   * `translate`): verde → amarillo → rojo según lo que queda. */
-  function drawTimeBar() {
-    const c = ctx!;
-    const frac = timeLeft / tripTime(level);
-    const y = OFFSET_Y + GRID_H + 5;
-    c.fillStyle = palette.timeTrack;
-    c.fillRect(OFFSET_X, y, GRID_W, 10);
-    const color = frac > 0.5 ? palette.timeHigh : frac > 0.25 ? palette.timeMid : palette.timeLow;
-    c.fillStyle = color;
-    glowOn(color);
-    c.fillRect(OFFSET_X, y, GRID_W * frac, 10);
-    noGlow();
-    // RETRO: la barra se corta en bloques, como un medidor de 8 bits.
-    const seg = palette.timeSegment;
-    if (seg > 0) {
-      c.fillStyle = palette.timeTrack;
-      for (let x = seg; x < GRID_W; x += seg) c.fillRect(OFFSET_X + x - 1, y, 2, 10);
-    }
-  }
-
-  function drawZones() {
-    const c = ctx!;
+  /** Zonas, oleaje, carriles, límites y bocas vacías — solo para `bgCache`. */
+  function drawZones(c: CanvasRenderingContext2D) {
     for (let row = 0; row < ROWS; row++) {
       c.fillStyle = rowColor(row);
       c.fillRect(0, row * CELL, GRID_W, CELL);
@@ -803,164 +800,131 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
     if (palette.zoneLine) {
       c.strokeStyle = palette.zoneLine;
       c.lineWidth = 2;
-      glowOn(palette.zoneLine);
+      glowOn(c, palette.zoneLine);
       c.beginPath();
       for (const row of [ROW_RIVER_TOP, ROW_SAFE_MID, ROW_ROAD_TOP, ROW_START]) {
         c.moveTo(0, row * CELL);
         c.lineTo(GRID_W, row * CELL);
       }
       c.stroke();
-      noGlow();
+      noGlow(c);
     }
-    // Bocas destino
-    GOAL_COLS.forEach((col, i) => {
+    // Bocas destino (vacías; las ranas que las llenan van aparte, por frame)
+    for (const col of GOAL_COLS) {
       const x = col * CELL;
       c.fillStyle = palette.goal;
       c.fillRect(x, 4, CELL * 2, CELL - 4);
       c.strokeStyle = palette.goalBorder;
       c.lineWidth = 2;
-      glowOn(palette.goalBorder);
+      glowOn(c, palette.goalBorder);
       c.strokeRect(x + 1, 5, CELL * 2 - 2, CELL - 6);
-      noGlow();
-      if (goalsFilled[i]) drawFrogAt(col + 0.5, ROW_GOALS, "down", false);
-    });
+      noGlow(c);
+    }
   }
 
   /** Marco alrededor de la cuadrícula (NEÓN con glow, RETRO duro). */
-  function drawFrame() {
+  function drawFrame(c: CanvasRenderingContext2D) {
     if (!palette.frame) return;
-    const c = ctx!;
     c.strokeStyle = palette.frame;
     c.lineWidth = 2;
-    glowOn(palette.frame);
+    glowOn(c, palette.frame);
     c.strokeRect(-2, -2, GRID_W + 4, GRID_H + 4);
-    noGlow();
+    noGlow(c);
   }
 
-  function drawCar(x: number, y: number, w: number, color: string, dir: 1 | -1) {
-    const c = ctx!;
+  function drawCar(c: CanvasRenderingContext2D, w: number, color: string, dir: 1 | -1) {
     c.fillStyle = palette.wheel;
-    for (const wx of [x + 6, x + w - 14]) {
-      c.fillRect(wx, y + 4, 8, 6);
-      c.fillRect(wx, y + CELL - 10, 8, 6);
+    for (const wx of [6, w - 14]) {
+      c.fillRect(wx, 4, 8, 6);
+      c.fillRect(wx, CELL - 10, 8, 6);
     }
-    paint(color, () => c.rect(x + 2, y + 8, w - 4, CELL - 16));
+    paint(c, color, () => c.rect(2, 8, w - 4, CELL - 16));
     // Parabrisas hacia el sentido de marcha
     c.fillStyle = palette.window;
-    const wsX = dir === 1 ? x + w - 14 : x + 6;
-    c.fillRect(wsX, y + 12, 8, CELL - 24);
+    c.fillRect(dir === 1 ? w - 14 : 6, 12, 8, CELL - 24);
   }
 
-  function drawTruck(x: number, y: number, w: number, dir: 1 | -1) {
-    const c = ctx!;
+  function drawTruck(c: CanvasRenderingContext2D, w: number, dir: 1 | -1) {
     c.fillStyle = palette.wheel;
-    for (const wx of [x + 6, x + w / 2 - 4, x + w - 14]) {
-      c.fillRect(wx, y + 3, 8, 6);
-      c.fillRect(wx, y + CELL - 9, 8, 6);
+    for (const wx of [6, w / 2 - 4, w - 14]) {
+      c.fillRect(wx, 3, 8, 6);
+      c.fillRect(wx, CELL - 9, 8, 6);
     }
     const cabW = CELL - 8;
-    const cabX = dir === 1 ? x + w - cabW - 2 : x + 2;
-    const boxX = dir === 1 ? x + 2 : x + cabW + 4;
+    const cabX = dir === 1 ? w - cabW - 2 : 2;
+    const boxX = dir === 1 ? 2 : cabW + 4;
     const boxW = w - cabW - 6;
-    paint(palette.truck, () => c.rect(boxX, y + 6, boxW, CELL - 12));
+    paint(c, palette.truck, () => c.rect(boxX, 6, boxW, CELL - 12));
     // RETRO: rayas de carga — el camión no se confunde con un coche largo.
     if (palette.truckStripe) {
       c.fillStyle = palette.truckStripe;
-      for (let sx = boxX + 10; sx < boxX + boxW - 6; sx += 10) c.fillRect(sx, y + 10, 2, CELL - 20);
+      for (let sx = boxX + 10; sx < boxX + boxW - 6; sx += 10) c.fillRect(sx, 10, 2, CELL - 20);
     }
-    paint(palette.truckCab, () => c.rect(cabX, y + 8, cabW, CELL - 16));
+    paint(c, palette.truckCab, () => c.rect(cabX, 8, cabW, CELL - 16));
     c.fillStyle = palette.window;
-    c.fillRect(dir === 1 ? cabX + cabW - 10 : cabX + 2, y + 12, 8, CELL - 24);
+    c.fillRect(dir === 1 ? cabX + cabW - 10 : cabX + 2, 12, 8, CELL - 24);
   }
 
-  function drawLog(x: number, y: number, w: number) {
-    const c = ctx!;
+  function drawLog(c: CanvasRenderingContext2D, w: number) {
     const radius = palette.chunky ? 0 : 12;
-    paint(palette.log, () => c.roundRect(x + 1, y + 5, w - 2, CELL - 10, radius));
+    paint(c, palette.log, () => c.roundRect(1, 5, w - 2, CELL - 10, radius));
     c.strokeStyle = palette.logGrain;
     c.lineWidth = 2;
-    for (const gy of [y + 14, y + CELL - 14]) {
+    for (const gy of [14, CELL - 14]) {
       c.beginPath();
-      c.moveTo(x + 12, gy);
-      c.lineTo(x + w - 12, gy);
+      c.moveTo(12, gy);
+      c.lineTo(w - 12, gy);
       c.stroke();
     }
   }
 
-  function drawTurtles(x: number, y: number, width: number, submerged: boolean) {
-    const c = ctx!;
+  /** Una tortuga en la celda (0, 0). Un grupo de `width` repite el sprite. */
+  function drawTurtle(c: CanvasRenderingContext2D, submerged: boolean) {
     const shape = (cx: number, cy: number, r: number) => {
-      if (palette.chunky) octagonPath(cx, cy, r);
+      if (palette.chunky) octagonPath(c, cx, cy, r);
       else c.arc(cx, cy, r, 0, Math.PI * 2);
     };
-    for (let i = 0; i < width; i++) {
-      const cx = x + i * CELL + CELL / 2;
-      const cy = y + CELL / 2;
-      if (submerged) {
-        // Hundida: solo un anillo tenue/punteado, sin relleno ni glow —
-        // tiene que leerse como "no sostiene" en las 3 skins.
-        c.strokeStyle = palette.turtleSubmerged;
-        c.lineWidth = 2;
-        c.setLineDash(palette.submergedDash);
-        c.beginPath();
-        shape(cx, cy, 14);
-        c.stroke();
-        c.setLineDash([]);
-        continue;
-      }
-      paint(palette.turtle, () => shape(cx, cy, 15));
-      // Escamas del caparazón
-      c.strokeStyle = palette.turtleShell;
+    const cx = CELL / 2;
+    const cy = CELL / 2;
+    if (submerged) {
+      // Hundida: solo un anillo tenue/punteado, sin relleno ni glow —
+      // tiene que leerse como "no sostiene" en las 3 skins.
+      c.strokeStyle = palette.turtleSubmerged;
       c.lineWidth = 2;
+      c.setLineDash(palette.submergedDash);
       c.beginPath();
-      shape(cx, cy, 8);
-      for (let k = 0; k < 6; k++) {
-        const a = (k * Math.PI) / 3;
-        c.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8);
-        c.lineTo(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15);
-      }
+      shape(cx, cy, 14);
       c.stroke();
+      c.setLineDash([]);
+      return;
     }
+    paint(c, palette.turtle, () => shape(cx, cy, 15));
+    // Escamas del caparazón
+    c.strokeStyle = palette.turtleShell;
+    c.lineWidth = 2;
+    c.beginPath();
+    shape(cx, cy, 8);
+    for (let k = 0; k < 6; k++) {
+      const a = (k * Math.PI) / 3;
+      c.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8);
+      c.lineTo(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15);
+    }
+    c.stroke();
   }
 
-  function drawLanes() {
-    for (const lane of lanes) {
-      const y = lane.row * CELL;
-      lane.entities.forEach((e, i) => {
-        const x = e.col * CELL;
-        const w = e.width * CELL;
-        if (e.type === "car")
-          drawCar(x, y, w, palette.cars[(lane.row + i) % palette.cars.length], lane.dir);
-        else if (e.type === "truck") drawTruck(x, y, w, lane.dir);
-        else if (e.type === "log") drawLog(x, y, w);
-        else drawTurtles(x, y, e.width, !!e.submerged);
-      });
-    }
-  }
-
-  /** Dibuja una rana centrada en la celda (`col`, `row`). `col` puede ser
-   * fraccionario (arrastre en el río, animación de salto). */
-  function drawFrogAt(col: number, row: number, facing: Direction, jumping: boolean) {
-    const c = ctx!;
-    const cx = col * CELL + CELL / 2;
-    const cy = row * CELL + CELL / 2;
-    const angle = {
-      up: 0,
-      right: Math.PI / 2,
-      down: Math.PI,
-      left: -Math.PI / 2,
-    }[facing];
+  /** Rana centrada en la celda (0, 0), mirando hacia `facing`. */
+  function drawFrog(c: CanvasRenderingContext2D, facing: Direction, jumping: boolean) {
     c.save();
-    c.translate(cx, cy);
-    c.rotate(angle);
+    c.translate(CELL / 2, CELL / 2);
+    c.rotate(FACING_ANGLE[facing]);
     // Patas: extendidas durante el salto
     const reach = jumping ? 16 : 11;
     for (const sx of [-1, 1]) {
-      paint(palette.frogDark, () => c.rect(sx * reach - 3, -12, 6, 8));
-      paint(palette.frogDark, () => c.rect(sx * reach - 3, 5, 6, 8));
+      paint(c, palette.frogDark, () => c.rect(sx * reach - 3, -12, 6, 8));
+      paint(c, palette.frogDark, () => c.rect(sx * reach - 3, 5, 6, 8));
     }
     // Cuerpo: elipse 28×24
-    paint(palette.frog, () => c.ellipse(0, 0, 14, 12, 0, 0, Math.PI * 2));
+    paint(c, palette.frog, () => c.ellipse(0, 0, 14, 12, 0, 0, Math.PI * 2));
     // Ojos
     for (const sx of [-1, 1]) {
       c.fillStyle = palette.eyeWhite;
@@ -975,34 +939,182 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
     c.restore();
   }
 
+  // ── Cachés de dibujo (spec 14) ──────────────────────────────────────
+  /** Margen de cada sprite: lo que se extiende el glow (≈ 1,5 × `shadowBlur`)
+   * más el medio trazo; sin glow, solo el borde. */
+  let pad = 0;
+  /** Fondo estático completo (800×600), ya con `translate` aplicado. */
+  let bgCache: HTMLCanvasElement | null = null;
+  /** Sprites deduplicados por `"<skin>:<tipo>:<color>[:<ancho>:<dir>]"`. */
+  const sprites = new Map<string, HTMLCanvasElement>();
+  /** Sprite de cada entidad no-tortuga, por índice de carril y de entidad.
+   * Depende solo de `LANE_SPECS` y la skin (los niveles no cambian tipos,
+   * anchos ni colores), así que `draw()` no arma claves por frame. */
+  let laneSprites: HTMLCanvasElement[][] = [];
+  let turtleUp: HTMLCanvasElement | null = null;
+  let turtleDown: HTMLCanvasElement | null = null;
+  /** Rana por `FACING_INDEX[facing] * 2 + (saltando ? 1 : 0)`. */
+  let frogSprites: HTMLCanvasElement[] = [];
+  /** Barra de tiempo llena en cada color: alto, medio, bajo. */
+  let timeSprites: HTMLCanvasElement[] = [];
+
+  function sprite(
+    key: string,
+    w: number,
+    h: number,
+    render: (c: CanvasRenderingContext2D) => void
+  ): HTMLCanvasElement {
+    const fullKey = `${skinId}:${key}`;
+    const cached = sprites.get(fullKey);
+    if (cached) return cached;
+    const cv = document.createElement("canvas");
+    cv.width = Math.ceil(w + 2 * pad);
+    cv.height = Math.ceil(h + 2 * pad);
+    const c = cv.getContext("2d")!;
+    c.translate(pad, pad);
+    render(c);
+    sprites.set(fullKey, cv);
+    return cv;
+  }
+
+  function buildCaches() {
+    pad = palette.glow > 0 ? Math.ceil(palette.glow * 1.5) + 2 : 2;
+
+    const bg = document.createElement("canvas");
+    bg.width = W;
+    bg.height = H;
+    const b = bg.getContext("2d")!;
+    b.fillStyle = palette.background;
+    b.fillRect(0, 0, W, H);
+    b.translate(OFFSET_X, OFFSET_Y);
+    drawZones(b);
+    // El marco va en el fondo: queda bajo las entidades, que de todos modos
+    // se recortan a la cuadrícula (solo tapan su glow interior).
+    drawFrame(b);
+    bgCache = bg;
+
+    laneSprites = LANE_SPECS.map((spec) => {
+      const w = spec.width * CELL;
+      const list: HTMLCanvasElement[] = [];
+      for (let i = 0; i < spec.count; i++) {
+        if (spec.type === "car") {
+          const color = palette.cars[(spec.row + i) % palette.cars.length];
+          list.push(
+            sprite(`car:${color}:${w}:${spec.dir}`, w, CELL, (c) => drawCar(c, w, color, spec.dir))
+          );
+        } else if (spec.type === "truck") {
+          list.push(sprite(`truck:${w}:${spec.dir}`, w, CELL, (c) => drawTruck(c, w, spec.dir)));
+        } else if (spec.type === "log") {
+          list.push(sprite(`log:${w}`, w, CELL, (c) => drawLog(c, w)));
+        }
+      }
+      return list;
+    });
+    turtleUp = sprite("turtle:up", CELL, CELL, (c) => drawTurtle(c, false));
+    turtleDown = sprite("turtle:down", CELL, CELL, (c) => drawTurtle(c, true));
+
+    frogSprites = [];
+    for (const facing of FACINGS) {
+      frogSprites.push(sprite(`frog:${facing}:0`, CELL, CELL, (c) => drawFrog(c, facing, false)));
+      frogSprites.push(sprite(`frog:${facing}:1`, CELL, CELL, (c) => drawFrog(c, facing, true)));
+    }
+
+    timeSprites = [palette.timeHigh, palette.timeMid, palette.timeLow].map((color) =>
+      sprite(`time:${color}`, GRID_W, TIME_BAR_H, (c) => {
+        c.fillStyle = color;
+        glowOn(c, color);
+        c.fillRect(0, 0, GRID_W, TIME_BAR_H);
+        noGlow(c);
+      })
+    );
+  }
+
+  /** Un único punto de invalidación: `setSkin` (y `destroy`, para liberar). */
+  function invalidateCaches() {
+    bgCache = null;
+    sprites.clear();
+    laneSprites = [];
+    turtleUp = null;
+    turtleDown = null;
+    frogSprites = [];
+    timeSprites = [];
+  }
+
+  function drawFrogSprite(
+    c: CanvasRenderingContext2D,
+    col: number,
+    row: number,
+    facing: Direction,
+    jumping: boolean
+  ) {
+    const s = frogSprites[FACING_INDEX[facing] * 2 + (jumping ? 1 : 0)];
+    c.drawImage(s, Math.round(col * CELL) - pad, Math.round(row * CELL) - pad);
+  }
+
+  function drawLanes(c: CanvasRenderingContext2D) {
+    for (let li = 0; li < lanes.length; li++) {
+      const lane = lanes[li];
+      const list = laneSprites[li];
+      const y = lane.row * CELL - pad;
+      const entities = lane.entities;
+      for (let i = 0; i < entities.length; i++) {
+        const e = entities[i];
+        const x = Math.round(e.col * CELL) - pad;
+        if (e.type === "turtle") {
+          const s = e.submerged ? turtleDown! : turtleUp!;
+          for (let k = 0; k < e.width; k++) c.drawImage(s, x + k * CELL, y);
+        } else {
+          c.drawImage(list[i], x, y);
+        }
+      }
+    }
+  }
+
+  /** Barra de tiempo en la franja negra bajo la cuadrícula (fuera del
+   * `translate`): verde → amarillo → rojo según lo que queda. El sprite se
+   * recorta al largo actual y se le pega la punta derecha, así el glow
+   * también cierra en el extremo. */
+  function drawTimeBar(c: CanvasRenderingContext2D) {
+    const frac = timeLeft / tripTime(level);
+    const y = OFFSET_Y + GRID_H + 5;
+    c.fillStyle = palette.timeTrack;
+    c.fillRect(OFFSET_X, y, GRID_W, TIME_BAR_H);
+    const len = Math.round(GRID_W * frac);
+    if (len > 0) {
+      const s = timeSprites[frac > 0.5 ? 0 : frac > 0.25 ? 1 : 2];
+      const h = s.height;
+      c.drawImage(s, 0, 0, pad + len, h, OFFSET_X - pad, y - pad, pad + len, h);
+      c.drawImage(s, pad + GRID_W, 0, pad, h, OFFSET_X + len, y - pad, pad, h);
+    }
+    // RETRO: la barra se corta en bloques, como un medidor de 8 bits.
+    const seg = palette.timeSegment;
+    if (seg > 0) {
+      c.fillStyle = palette.timeTrack;
+      for (let x = seg; x < GRID_W; x += seg) c.fillRect(OFFSET_X + x - 1, y, 2, TIME_BAR_H);
+    }
+  }
+
   function draw() {
     const c = ctx!;
-    c.fillStyle = palette.background;
-    c.fillRect(0, 0, W, H);
+    if (!bgCache) buildCaches();
+    c.drawImage(bgCache!, 0, 0);
     c.save();
     c.translate(OFFSET_X, OFFSET_Y);
-    drawZones();
-    // Las entidades que asoman por los bordes se recortan a la cuadrícula.
-    c.save();
+    for (let i = 0; i < GOAL_COLS.length; i++) {
+      if (goalsFilled[i]) drawFrogSprite(c, GOAL_COLS[i] + 0.5, ROW_GOALS, "down", false);
+    }
+    // Un solo clip para entidades y rana: lo que asoma por los bordes se
+    // recorta, y la rana montada en un tronco desaparece con él.
     c.beginPath();
     c.rect(0, 0, GRID_W, GRID_H);
     c.clip();
-    drawLanes();
-    c.restore();
+    drawLanes(c);
     const t = frog.animating ? Math.min(1, frog.animT / HOP_MS) : 1;
     const frogCol = frog.animating ? frog.fromCol + (frog.targetCol - frog.fromCol) * t : frog.col;
     const frogRow = frog.animating ? frog.fromRow + (frog.targetRow - frog.fromRow) * t : frog.row;
-    // Recortada a la cuadrícula: montada en un tronco que sale por un borde,
-    // la rana desaparece con él y reaparece del otro lado.
-    c.save();
-    c.beginPath();
-    c.rect(0, 0, GRID_W, GRID_H);
-    c.clip();
-    drawFrogAt(frogCol, frogRow, frog.facing, frog.animating);
+    drawFrogSprite(c, frogCol, frogRow, frog.facing, frog.animating);
     c.restore();
-    drawFrame();
-    c.restore();
-    drawTimeBar();
+    drawTimeBar(c);
   }
 
   // ── Loop principal ──────────────────────────────────────────────────
@@ -1014,6 +1126,12 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
     lastTime = ts;
     update(dt);
     draw();
+    // Tras el game over queda el último frame quieto detrás del modal y el
+    // loop se corta (spec 14); `restart()` lo vuelve a arrancar.
+    if (internalPhase === "gameover") {
+      rafId = null;
+      return;
+    }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -1062,14 +1180,18 @@ export const createFroggerEngine: EngineFactory = (canvas, onState, options) => 
       reportState();
     },
     setSkin(skin: SkinId) {
-      palette = SKINS[skin] ?? SKINS[DEFAULT_SKIN];
-      // En pausa no hay frames corriendo: redibuja una vez para que se vea.
+      skinId = SKINS[skin] ? skin : DEFAULT_SKIN;
+      palette = SKINS[skinId];
+      invalidateCaches();
+      // En pausa o tras el game over no hay frames corriendo: redibuja una
+      // vez para que se vea.
       if (rafId === null) draw();
     },
     destroy() {
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = null;
       window.removeEventListener("keydown", handleKeyDown);
+      invalidateCaches();
     },
   };
 };
