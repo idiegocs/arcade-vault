@@ -40,6 +40,16 @@ const START_COL = 7;
 const START_LIVES = 3;
 /** Duración de la animación de un salto de 1 celda. */
 const HOP_MS = 120;
+/** Margen horizontal (en celdas) del cuerpo de la rana para chocar con un
+ * vehículo — evita muertes por un roce de píxeles con la celda vecina. */
+const FROG_HIT_INSET = 0.15;
+/** Temporizador del nivel 1 (s); el paso 5 lo hace bajar con el nivel. */
+const BASE_TIME_S = 15;
+
+// Puntuación (spec, Modelo de datos) — todo entero.
+const PTS_NEW_ROW = 10;
+const PTS_GOAL = 50;
+const PTS_PER_SECOND_LEFT = 10;
 
 /** Las 5 bocas destino: columna izquierda de cada una (ocupan 2 columnas),
  * separadas por 1 columna de orilla en los bordes y 2 entre bocas. */
@@ -214,6 +224,11 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
   /** Bocas ocupadas en la ronda actual (mismo índice que `GOAL_COLS`). */
   let goalsFilled: boolean[] = [];
   let frog: Frog = makeFrog();
+  /** Fila más alta (índice más bajo) alcanzada en la ronda: solo avanzar más
+   * allá suma puntos, así ir y venir no se puede farmear. */
+  let bestRow = ROW_START;
+  /** Segundos restantes del viaje actual de la rana. */
+  let timeLeft = BASE_TIME_S;
 
   function makeFrog(): Frog {
     return {
@@ -239,6 +254,8 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     goalsFilled = GOAL_COLS.map(() => false);
     frog = makeFrog();
     pendingDir = null;
+    bestRow = ROW_START;
+    timeLeft = BASE_TIME_S;
   }
 
   // ── Reporte de estado a React ──────────────────────────────────────
@@ -303,16 +320,103 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     frog.targetRow = targetRow;
   }
 
-  function updateFrog(dt: number) {
-    if (!frog.animating) {
-      tryStartHop();
+  // ── Colisiones, río y bocas ─────────────────────────────────────────
+  function laneAt(row: number): Lane | undefined {
+    return lanes.find((l) => l.row === row);
+  }
+
+  function isRiverRow(row: number): boolean {
+    return row >= ROW_RIVER_TOP && row <= ROW_RIVER_BOT;
+  }
+
+  function isRoadRow(row: number): boolean {
+    return row >= ROW_ROAD_TOP && row <= ROW_ROAD_BOT;
+  }
+
+  function checkRoadCollision(): boolean {
+    const lane = laneAt(frog.row);
+    if (!lane) return false;
+    const left = frog.col + FROG_HIT_INSET;
+    const right = frog.col + 1 - FROG_HIT_INSET;
+    return lane.entities.some((e) => left < e.col + e.width && right > e.col);
+  }
+
+  /** Entidad del río que sostiene a la rana (su centro cae encima), o
+   * `null` si está en el agua o sobre tortugas sumergidas. */
+  function getSupport(): Entity | null {
+    const lane = laneAt(frog.row);
+    if (!lane) return null;
+    const center = frog.col + 0.5;
+    const e = lane.entities.find((en) => center >= en.col && center <= en.col + en.width);
+    if (!e || e.submerged) return null;
+    return e;
+  }
+
+  /** Índice de la boca cuyas 2 columnas contienen `col`, o -1. */
+  function goalIndexAt(col: number): number {
+    return GOAL_COLS.findIndex((gc) => col === gc || col === gc + 1);
+  }
+
+  /** Vuelve la rana a la base de inicio para un viaje nuevo. */
+  function respawnFrog() {
+    frog = makeFrog();
+    pendingDir = null;
+    timeLeft = BASE_TIME_S;
+  }
+
+  function killFrog() {
+    respawnFrog();
+  }
+
+  /** Lógica de la celda donde terminó un salto. */
+  function onLanded() {
+    if (frog.row < bestRow) {
+      score += PTS_NEW_ROW * (bestRow - frog.row);
+      bestRow = frog.row;
+    }
+    if (frog.row !== ROW_GOALS) return;
+    const i = goalIndexAt(frog.col);
+    if (i === -1 || goalsFilled[i]) {
+      killFrog();
       return;
     }
-    frog.animT += dt * 1000;
-    if (frog.animT < HOP_MS) return;
-    frog.animating = false;
-    frog.col = frog.targetCol;
-    frog.row = frog.targetRow;
+    goalsFilled[i] = true;
+    score += PTS_GOAL + PTS_PER_SECOND_LEFT * Math.floor(timeLeft);
+    respawnFrog();
+  }
+
+  function updateFrog(dt: number) {
+    if (frog.animating) {
+      frog.animT += dt * 1000;
+      if (frog.animT < HOP_MS) return;
+      frog.animating = false;
+      frog.col = frog.targetCol;
+      frog.row = frog.targetRow;
+      onLanded();
+      return;
+    }
+    // Quieta (o recién aterrizada): carretera y río se evalúan cada frame —
+    // un coche que la alcanza o una tortuga que se hunde la matan aunque
+    // no se mueva. En el aire (animando) no la toca nada.
+    if (isRoadRow(frog.row) && checkRoadCollision()) {
+      killFrog();
+      return;
+    }
+    if (isRiverRow(frog.row)) {
+      const support = getSupport();
+      if (!support) {
+        killFrog();
+        return;
+      }
+      const lane = laneAt(frog.row)!;
+      frog.col += lane.speed * lane.dir * dt;
+      const center = frog.col + 0.5;
+      if (center < 0 || center > COLS) {
+        killFrog();
+        return;
+      }
+    }
+    tryStartHop();
   }
 
   function update(dt: number) {
