@@ -38,6 +38,8 @@ const ROW_START = 13;
 
 const START_COL = 7;
 const START_LIVES = 3;
+/** Duración de la animación de un salto de 1 celda. */
+const HOP_MS = 120;
 
 /** Las 5 bocas destino: columna izquierda de cada una (ocupan 2 columnas),
  * separadas por 1 columna de orilla en los bordes y 2 entre bocas. */
@@ -76,6 +78,24 @@ const TURTLE_CYCLE_S = TURTLE_UP_S + TURTLE_DOWN_S;
 const LEVEL_SPEEDUP = 1.15;
 
 type Direction = "up" | "down" | "left" | "right";
+
+const DIR_DELTA: Record<Direction, { dc: number; dr: number }> = {
+  up: { dc: 0, dr: -1 },
+  down: { dc: 0, dr: 1 },
+  left: { dc: -1, dr: 0 },
+  right: { dc: 1, dr: 0 },
+};
+
+const DIRECTION_KEYS: Record<string, Direction> = {
+  ArrowUp: "up",
+  KeyW: "up",
+  ArrowDown: "down",
+  KeyS: "down",
+  ArrowLeft: "left",
+  KeyA: "left",
+  ArrowRight: "right",
+  KeyD: "right",
+};
 
 interface Entity {
   /** Columna izquierda, continua (las entidades se mueven en px/s). */
@@ -167,6 +187,23 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
 
+  // ── Input ────────────────────────────────────────────────────────────
+  /** Un único salto pendiente: el pedido durante una animación se ejecuta
+   * al terminarla; uno nuevo reemplaza al anterior. */
+  let pendingDir: Direction | null = null;
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    const dir = DIRECTION_KEYS[e.code];
+    if (!dir) return;
+    e.preventDefault();
+    // Una pulsación = un salto: mantener la tecla no encadena saltos.
+    if (e.repeat) return;
+    if (internalPhase === "gameover" || isPaused) return;
+    pendingDir = dir;
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+
   // ── Estado mutable del juego ────────────────────────────────────────
   let score = 0;
   let lives = START_LIVES;
@@ -201,6 +238,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     lanes = buildLanes(level);
     goalsFilled = GOAL_COLS.map(() => false);
     frog = makeFrog();
+    pendingDir = null;
   }
 
   // ── Reporte de estado a React ──────────────────────────────────────
@@ -243,12 +281,47 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     }
   }
 
+  /** Arranca el salto pendiente, si lo hay y el destino está dentro de la
+   * cuadrícula (bordes laterales y fila de inicio: el salto se ignora). */
+  function tryStartHop() {
+    if (!pendingDir) return;
+    const dir = pendingDir;
+    pendingDir = null;
+    frog.facing = dir;
+    const { dc, dr } = DIR_DELTA[dir];
+    // En el río la columna es continua: se salta desde la celda más cercana.
+    const fromCol = Math.round(frog.col);
+    const targetCol = fromCol + dc;
+    const targetRow = frog.row + dr;
+    if (targetCol < 0 || targetCol >= COLS || targetRow < ROW_GOALS || targetRow > ROW_START)
+      return;
+    frog.animating = true;
+    frog.animT = 0;
+    frog.fromCol = frog.col;
+    frog.fromRow = frog.row;
+    frog.targetCol = targetCol;
+    frog.targetRow = targetRow;
+  }
+
+  function updateFrog(dt: number) {
+    if (!frog.animating) {
+      tryStartHop();
+      return;
+    }
+    frog.animT += dt * 1000;
+    if (frog.animT < HOP_MS) return;
+    frog.animating = false;
+    frog.col = frog.targetCol;
+    frog.row = frog.targetRow;
+  }
+
   function update(dt: number) {
     if (internalPhase === "gameover") {
       reportState();
       return;
     }
     updateLanes(dt);
+    updateFrog(dt);
     reportState();
   }
 
@@ -434,7 +507,10 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     c.clip();
     drawLanes();
     c.restore();
-    drawFrogAt(frog.col, frog.row, frog.facing, frog.animating);
+    const t = frog.animating ? Math.min(1, frog.animT / HOP_MS) : 1;
+    const frogCol = frog.animating ? frog.fromCol + (frog.targetCol - frog.fromCol) * t : frog.col;
+    const frogRow = frog.animating ? frog.fromRow + (frog.targetRow - frog.fromRow) * t : frog.row;
+    drawFrogAt(frogCol, frogRow, frog.facing, frog.animating);
     c.restore();
   }
 
@@ -497,6 +573,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     destroy() {
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = null;
+      window.removeEventListener("keydown", handleKeyDown);
     },
   };
 };
