@@ -48,6 +48,9 @@ const INITIAL_STATE: EngineState = { score: 0, lives: 3, level: 1, phase: "playi
  * la partida (ver el efecto en `GamePlayerShell`). */
 const GAME_KEYS = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
+/** Contador de FPS (spec 14): solo en dev, nunca en producción. */
+const SHOW_FPS = process.env.NODE_ENV !== "production";
+
 const COARSE_POINTER = "(pointer: coarse)";
 
 function subscribeCoarsePointer(onChange: () => void) {
@@ -125,6 +128,44 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
   const playerRef = useRef<HTMLDivElement>(null);
   const fullscreenEnabled = useFullscreenEnabled();
   const isFullscreen = useIsFullscreen();
+
+  // Contador de FPS (spec 14, solo dev): rAF propio del shell, independiente
+  // del motor. Todo vive en refs y el overlay se escribe por `textContent`
+  // una vez por segundo — medir no debe costar un render de React.
+  const fpsRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef({ frames: 0, worstMs: 0, lastTs: 0, windowStart: 0, rafId: 0 });
+  useEffect(() => {
+    if (!SHOW_FPS) return;
+    const s = statsRef.current;
+    const tick = (ts: number) => {
+      const dt = ts - s.lastTs;
+      if (s.lastTs === 0 || dt > 1000) {
+        // Primer frame, o volvió de una pestaña oculta: ventana nueva.
+        s.frames = 0;
+        s.worstMs = 0;
+        s.windowStart = ts;
+      } else {
+        s.frames++;
+        if (dt > s.worstMs) s.worstMs = dt;
+      }
+      s.lastTs = ts;
+      const elapsed = ts - s.windowStart;
+      if (elapsed >= 1000) {
+        if (fpsRef.current) {
+          fpsRef.current.textContent = `${Math.round((s.frames * 1000) / elapsed)} FPS · ${s.worstMs.toFixed(1)} ms`;
+        }
+        s.frames = 0;
+        s.worstMs = 0;
+        s.windowStart = ts;
+      }
+      s.rafId = requestAnimationFrame(tick);
+    };
+    s.rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(s.rafId);
+      s.lastTs = 0;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -423,6 +464,28 @@ export function GamePlayerShell({ gameId, gameTitle, username }: Props) {
             height={ARENA_HEIGHT}
             style={{ display: "block", width: "100%", height: "100%" }}
           />
+          {SHOW_FPS ? (
+            <div
+              ref={fpsRef}
+              className="mono"
+              aria-hidden="true"
+              data-fps-meter=""
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 10,
+                zIndex: 6,
+                padding: "2px 6px",
+                fontSize: 10,
+                letterSpacing: "0.08em",
+                color: "var(--green)",
+                background: "rgba(0,0,0,0.6)",
+                pointerEvents: "none",
+              }}
+            >
+              — FPS
+            </div>
+          ) : null}
           {!ready && (
             <div className="crt-content" style={{ zIndex: 5 }}>
               CARGANDO…

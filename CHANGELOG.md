@@ -6,6 +6,21 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.5.2] - 2026-10-12
+
+Spec: [`14-rendimiento-motores-v0.5.2`](specs/14-rendimiento-motores-v0.5.2.md)
+
+### Added
+
+- Contador de FPS en el reproductor, solo en desarrollo: FPS promedio y peor frame, en una esquina de la pantalla del CRT.
+- Sección "Rendimiento" en `components/games/README.md` y en la referencia del skill `add-game`, con las reglas de dibujo para los motores nuevos.
+
+### Changed
+
+- RANARIA corre fluida en celular: el fondo y todo lo que brilla en NEÓN se dibujan una vez por skin y se reutilizan. En el peor caso medido (sin GPU, CPU 4x), el trabajo por frame en NEÓN baja de 16,1 a 3 ms. Se ve igual en las 3 skins.
+- RANARIA deja de redibujar tras el game over: el canvas queda quieto detrás del modal hasta JUGAR DE NUEVO.
+- Mientras se juega, la grilla animada del fondo de la página queda quieta. En el resto de las páginas sigue animada.
+
 ## [0.5.1] - 2026-10-12
 
 Spec: [`game-jam/03-Frogger/01-frogger-core`](specs/game-jam/03-Frogger/01-frogger-core.md)

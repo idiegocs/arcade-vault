@@ -90,6 +90,10 @@ a { color: inherit; text-decoration: none; }
   animation: gridscroll 8s linear infinite;
   opacity: 0.55;
 }
+/* Mientras se juega, la grilla queda quieta (spec 14): animar
+   background-position en una capa con perspective + mask-image obliga a
+   recomponerla junto al canvas en cada frame. Se ve igual, pero sin moverse. */
+body:has(.av-player) .av-bg::before { animation: none; }
 @keyframes gridscroll {
   to { background-position: 0 60px, 0 60px; }
 }
