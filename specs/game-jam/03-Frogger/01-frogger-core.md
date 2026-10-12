@@ -1,6 +1,6 @@
 # SPEC — Motor real del juego RANARIA (Frogger)
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** 05-rocas-asteroids-motor, 06-ranking-global-catalogo-juegos-v0.2.0, 11-score-plausibility-caps-v0.2.5
 > **Fecha:** 2026-10-12
 > **Versión:** 0.5.0 → 0.5.1 (patch — el juego ya está en el catálogo, esto le agrega su motor real)
