@@ -10,6 +10,7 @@
  *   8–12 carretera, 13 base de inicio.
  * - No dibuja su propio HUD (score/vidas/nivel) ni overlays de pausa o game
  *   over — eso vive en el shell de React. El tiempo restante va en `badge`.
+ * - Sonido vía `defineSounds` (`../audio`): hop/squash/splash/goal/round.
  */
 import {
   ARENA_HEIGHT as H,
@@ -18,6 +19,29 @@ import {
   type EnginePhase,
   type EngineState,
 } from "../game-engine";
+import { beep, defineSounds } from "../audio";
+
+/** Sonidos de este juego (ver `defineSounds` en `../audio`). */
+const playSound = defineSounds({
+  hop: () => beep(520, 0.04, "square", 0.06),
+  squash: () => {
+    beep(160, 0.18, "sawtooth", 0.18);
+    beep(90, 0.25, "square", 0.12);
+  },
+  splash: () => {
+    beep(320, 0.12, "triangle", 0.14);
+    beep(180, 0.3, "sine", 0.14);
+  },
+  goal: () => {
+    beep(660, 0.08, "triangle", 0.15);
+    beep(990, 0.16, "triangle", 0.12);
+  },
+  round: () => {
+    beep(523, 0.12, "square", 0.12);
+    beep(784, 0.2, "square", 0.1);
+    beep(1047, 0.35, "triangle", 0.12);
+  },
+});
 
 const COLS = 16;
 const ROWS = 14;
@@ -330,6 +354,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       return;
     frog.animating = true;
     frog.animT = 0;
+    playSound("hop");
     frog.fromCol = frog.col;
     frog.fromRow = frog.row;
     frog.targetCol = targetCol;
@@ -382,7 +407,8 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
 
   /** Resta una vida: con vidas restantes la rana vuelve al inicio; sin
    * vidas, termina la partida (el shell guarda el score). */
-  function killFrog() {
+  function killFrog(cause: "squash" | "splash") {
+    playSound(cause);
     lives = Math.max(0, lives - 1);
     if (lives === 0) {
       internalPhase = "gameover";
@@ -412,13 +438,18 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     if (frog.row !== ROW_GOALS) return;
     const i = goalIndexAt(frog.col);
     if (i === -1 || goalsFilled[i]) {
-      killFrog();
+      killFrog("splash");
       return;
     }
     goalsFilled[i] = true;
     score += PTS_GOAL + PTS_PER_SECOND_LEFT * Math.floor(timeLeft);
-    if (goalsFilled.every(Boolean)) completeRound();
-    else respawnFrog();
+    if (goalsFilled.every(Boolean)) {
+      playSound("round");
+      completeRound();
+    } else {
+      playSound("goal");
+      respawnFrog();
+    }
   }
 
   function updateFrog(dt: number) {
@@ -435,20 +466,20 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     // un coche que la alcanza o una tortuga que se hunde la matan aunque
     // no se mueva. En el aire (animando) no la toca nada.
     if (isRoadRow(frog.row) && checkRoadCollision()) {
-      killFrog();
+      killFrog("squash");
       return;
     }
     if (isRiverRow(frog.row)) {
       const support = getSupport();
       if (!support) {
-        killFrog();
+        killFrog("splash");
         return;
       }
       const lane = laneAt(frog.row)!;
       frog.col += lane.speed * lane.dir * dt;
       const center = frog.col + 0.5;
       if (center < 0 || center > COLS) {
-        killFrog();
+        killFrog("splash");
         return;
       }
     }
@@ -462,7 +493,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     }
     updateLanes(dt);
     timeLeft = Math.max(0, timeLeft - dt);
-    if (timeLeft === 0) killFrog();
+    if (timeLeft === 0) killFrog("splash");
     else updateFrog(dt);
     reportState();
   }

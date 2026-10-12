@@ -99,5 +99,6 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
   ranaria: {
     load: () => import("./ranaria/frogger-engine").then((m) => m.createFroggerEngine),
     maxPlausibleScore: 100_000,
+    music: "turbo",
   },
 };

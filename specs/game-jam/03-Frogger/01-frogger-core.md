@@ -25,6 +25,7 @@
 - 3 vidas, puntaje, niveles y temporizador según el Modelo de datos.
 - `components/games/registry.ts`: entrada `ranaria` con `load` por `import()` dinámico y `maxPlausibleScore`.
 - `references/juegos-implementados.md`: `ranaria` pasa a ✅.
+- Sonido (agregado durante la implementación, a pedido): 5 efectos sintetizados con `defineSounds` dentro del motor y `music: "turbo"` en la entrada del registry.
 - `package.json` `0.5.0` → `0.5.1` + entrada en `CHANGELOG.md`.
 
 **Lo agregan los agentes de la Fase 5 de `/spec-impl-game` (no son pasos de este plan):**
@@ -37,7 +38,7 @@
 - Fila nueva en `games`, SQL o cover CSS — la fila `ranaria` y `.cover-rana` ya existen (Caso B).
 - Componente React propio, play-page propia o guardado propio del score — los da el reproductor común.
 - HUD de texto dibujado en el canvas (score/vidas/nivel) y overlays propios de pausa o game over — viven en `game-player-shell.tsx`.
-- Sonidos (`defineSounds`) y música de fondo (`music` en el registry) — para un spec siguiente.
+- Una pista de música propia de RANARIA en `music-tracks.ts` — se reutiliza una existente.
 - Sprites bitmap — todo se dibuja con primitivas canvas.
 - Animaciones de muerte elaboradas, mosca bonus y cocodrilo — spec secundario.
 - Cambios a `game-player-shell.tsx`, `game-engine.ts` o `app/actions/scores.ts`.
@@ -88,6 +89,18 @@ Sin tablas nuevas ni SQL — reusa `games`/`scores`. La fila existente:
 
 Listeners en `window` sobre `e.code`; los `keydown` con `e.repeat` se ignoran (una pulsación = un salto). Un salto pedido durante la animación queda como único salto pendiente. Sin tecla de pausa propia.
 
+**Sonido** (`defineSounds` de `components/games/audio.ts`, declarado en el motor):
+
+| Sonido   | Dispara en |
+| -------- | ---------- |
+| `hop`    | Cada salto que arranca. |
+| `squash` | Atropellada por un vehículo. |
+| `splash` | Cae al agua, tortuga hundida, arrastre fuera del borde, tiempo agotado o fila 0 fuera de boca / boca ocupada. |
+| `goal`   | Ocupa una boca libre (si completa la ronda, suena `round` en su lugar). |
+| `round`  | Completa la ronda (5 bocas). |
+
+**Música:** `music: "turbo"` en el registry (pista existente de spec 13; el jugador puede cambiarla desde ⚙).
+
 ```mermaid
 flowchart LR
   games[("games")] --> jugarPage["/juegos/ranaria/jugar"]
@@ -107,7 +120,7 @@ flowchart LR
 3. **Rana**: input de la tabla de Controles, salto discreto con animación de 120 ms (patas extendidas), límites laterales e inferior. Test manual: un salto por pulsación, sin scroll de página.
 4. **Colisiones, río y bocas**: choque con vehículos, soporte en el río (arrastre, caída al agua, tortuga sumergida, salida por el borde), llegada a la fila 0 (boca libre / ocupada / fuera de boca), puntuación de la tabla. Test manual: cada causa de muerte y cada evento de puntaje.
 5. **Vidas, temporizador y rondas**: `killFrog()` (resta vida, respawn, reinicia tiempo, `"gameover"` en 0), temporizador con su barra y el `badge`, `completeRound()` (+200, nivel +1, carriles más rápidos, bocas vacías). Test manual: perder las 3 vidas; completar una ronda y ver nivel 2 más rápido y con menos tiempo.
-6. **Registry** — hecho en el paso 2. Acá solo se revisa que la entrada `ranaria` siga completa (`load`, `maxPlausibleScore`) tras los pasos 3–5.
+6. **Registry y sonido** — la entrada `ranaria` se creó en el paso 2; acá se revisa que siga completa (`load`, `maxPlausibleScore`) y se le agrega `music: "turbo"`. Sonidos de la tabla con `defineSounds` en el motor (agregado durante la implementación, a pedido). Test manual: cada evento suena; con mute (♪ del nav) no suena nada; la música TURBO arranca con la partida.
 7. **Versión**: `package.json` `0.5.0` → `0.5.1` + entrada en `CHANGELOG.md`. Test manual: el Footer muestra `v0.5.1`.
 8. **Verificación end-to-end** (sección de `add-game-impl`): lint + build, Playwright, guardado real con sesión, reflejo en rankings, aislamiento de chunk, entrar/salir sin fugas.
 
@@ -134,6 +147,8 @@ flowchart LR
 - [ ] FIN fuerza game over con el score actual; JUGAR DE NUEVO reinicia (score 0, 3 vidas, nivel 1).
 - [ ] Con sesión, una partida terminada crea exactamente una fila en `scores` con `game_id = 'ranaria'`, reflejada en `/juegos/ranaria`, `/games` y `/salon-de-la-fama`; sin sesión, el modal muestra el CTA a `/auth`.
 - [ ] Visitar otro juego no descarga el chunk de `frogger-engine.ts`; entrar y salir varias veces no acumula listeners ni RAF.
+- [ ] `hop`/`squash`/`splash`/`goal`/`round` suenan en sus eventos; con mute activo no se crea ningún nodo de audio.
+- [ ] La música TURBO suena durante la partida y respeta pausa, game over y mute (comportamiento del reproductor, spec 13).
 - [ ] El motor no lee `localStorage` ni toca el DOM fuera del canvas.
 - [ ] `npm run lint` y `npm run build` sin errores.
 
@@ -149,7 +164,7 @@ flowchart LR
 - **Sí: `maxPlausibleScore = 100_000`** como techo de cordura (juego sin final), mismo criterio que serpentina.
 - **Sí: primitivas canvas, saltos discretos, 3 vidas, tortugas con inmersión, 5 bocas** — sin cambios respecto del spec original.
 - **Sí: bump patch** (`0.5.0 → 0.5.1`): el juego ya estaba en el catálogo, se le agrega el motor (mismo criterio que specs 09 y 10).
-- **No: sonidos ni música en este spec** — el spec original no los definía; van en uno siguiente.
+- **Sí: sonidos y música** — el spec original no los definía; se agregaron durante la implementación a pedido, para que RANARIA no sea el único juego con motor sin sonido. Música: se reutiliza TURBO (rápida, 160 bpm, va con la autopista) en vez de una pista nueva.
 - **No: tocar `game-player-shell.tsx`, `game-engine.ts` o `app/actions/scores.ts`.**
 
 ---
