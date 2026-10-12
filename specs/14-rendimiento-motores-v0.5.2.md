@@ -1,6 +1,6 @@
 # SPEC 14 — Rendimiento del motor de RANARIA
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 
 > **Depende de:** game-jam/03-Frogger/01-frogger-core (RANARIA), 12-controles-tactiles-movil-v0.4.0 (layout táctil), 13-musica-de-fondo-v0.5.0 (shell y panel ⚙)
 > **Fecha:** 2026-10-12
