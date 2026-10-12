@@ -99,6 +99,18 @@ export const GAME_ENGINES: Record<string, GameRegistration> = {
   ranaria: {
     load: () => import("./ranaria/frogger-engine").then((m) => m.createFroggerEngine),
     maxPlausibleScore: 100_000,
+    skins: ["clasico", "neon", "retro"],
     music: "turbo",
+    // Un toque = un salto; sin `repeat`: el motor ignora a propósito el
+    // auto-repeat (mantener no encadena saltos), y los eventos sintéticos
+    // del gamepad no traen `e.repeat`, así que un timer sí los encadenaría.
+    touchControls: {
+      dpad: {
+        up: { code: "ArrowUp", label: "▲" },
+        down: { code: "ArrowDown", label: "▼" },
+        left: { code: "ArrowLeft", label: "◀" },
+        right: { code: "ArrowRight", label: "▶" },
+      },
+    },
   },
 };

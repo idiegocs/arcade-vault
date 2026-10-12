@@ -11,13 +11,17 @@
  * - No dibuja su propio HUD (score/vidas/nivel) ni overlays de pausa o game
  *   over — eso vive en el shell de React. El tiempo restante va en `badge`.
  * - Sonido vía `defineSounds` (`../audio`): hop/squash/splash/goal/round.
+ * - Skins visuales (`clasico`/`neon`/`retro`, ver `SKINS`), con el patrón de
+ *   CAÍDA: el dibujo lee siempre de `palette` y `setSkin` la cambia en vivo.
  */
 import {
   ARENA_HEIGHT as H,
   ARENA_WIDTH as W,
+  DEFAULT_SKIN,
   type EngineFactory,
   type EnginePhase,
   type EngineState,
+  type SkinId,
 } from "../game-engine";
 import { beep, defineSounds } from "../audio";
 
@@ -85,33 +89,199 @@ const PTS_ROUND = 200;
  * separadas por 1 columna de orilla en los bordes y 2 entre bocas. */
 const GOAL_COLS = [1, 4, 7, 10, 13];
 
-const COLORS = {
-  background: "#000",
-  goalBank: "#0f5132",
-  goal: "#14532d",
-  goalBorder: "#facc15",
-  river: "#0b1d4a",
-  safe: "#1a3d1a",
-  road: "#111",
-  laneMark: "rgba(255,255,255,0.25)",
-  cars: ["#ef4444", "#facc15", "#3b82f6", "#f97316"],
-  wheel: "#222",
-  window: "rgba(255,255,255,0.6)",
-  truck: "#9ca3af",
-  truckCab: "#6b7280",
-  log: "#8b5a2b",
-  logGrain: "#5c3a1a",
-  turtle: "#16a34a",
-  turtleShell: "#14532d",
-  turtleSubmerged: "rgba(74,222,128,0.35)",
-  timeHigh: "#22c55e",
-  timeMid: "#facc15",
-  timeLow: "#ef4444",
-  timeTrack: "#1f2937",
-  frog: "#4ade80",
-  frogDark: "#15803d",
-  eyeWhite: "#fff",
-  eyePupil: "#000",
+type FroggerPalette = {
+  /** Fondo de todo el canvas (incluye la franja de la barra de tiempo). */
+  background: string;
+  goalBank: string;
+  goal: string;
+  goalBorder: string;
+  river: string;
+  safe: string;
+  road: string;
+  /** Líneas discontinuas entre carriles de carretera. */
+  laneMark: string;
+  /** Marcas de oleaje sobre el río (`null` = agua lisa). */
+  riverMark: string | null;
+  /** Línea en los límites entre zonas (`null` = sin línea). */
+  zoneLine: string | null;
+  /** Marco alrededor de la cuadrícula (`null` = sin marco). */
+  frame: string | null;
+  cars: string[];
+  wheel: string;
+  window: string;
+  truck: string;
+  truckCab: string;
+  /** Rayas de carga sobre la caja del camión (`null` = caja lisa). */
+  truckStripe: string | null;
+  log: string;
+  logGrain: string;
+  turtle: string;
+  turtleShell: string;
+  turtleSubmerged: string;
+  /** Trazo de la tortuga sumergida (`[]` = continuo). */
+  submergedDash: number[];
+  timeHigh: string;
+  timeMid: string;
+  timeLow: string;
+  timeTrack: string;
+  /** Barra de tiempo en bloques de N px con 2 px de hueco (0 = continua). */
+  timeSegment: number;
+  frog: string;
+  frogDark: string;
+  eyeWhite: string;
+  eyePupil: string;
+  /** `shadowBlur` de lo que brilla (0 = sin glow); el `shadowColor` es el
+   * color de cada cosa. */
+  glow: number;
+  /** Entidades como "tubo de neón": contorno brillante, relleno casi
+   * transparente y núcleo blanco fino (`null` = relleno sólido). */
+  tube: { lineWidth: number; fillAlpha: number; core: string } | null;
+  /** Borde duro alrededor de cada entidad (`null` = sin borde). */
+  edge: string | null;
+  edgeWidth: number;
+  /** Siluetas de píxel: troncos de esquinas rectas y tortugas octogonales. */
+  chunky: boolean;
+};
+
+/** Paleta NES reducida a 6 tonos. */
+const NES = {
+  black: "#000000",
+  blue: "#0000bc",
+  white: "#fcfcfc",
+  green: "#00a800",
+  red: "#d82800",
+  ochre: "#ac7c00",
+};
+
+const SKINS: Record<SkinId, FroggerPalette> = {
+  // Look original del motor, copiado tal cual.
+  clasico: {
+    background: "#000",
+    goalBank: "#0f5132",
+    goal: "#14532d",
+    goalBorder: "#facc15",
+    river: "#0b1d4a",
+    safe: "#1a3d1a",
+    road: "#111",
+    laneMark: "rgba(255,255,255,0.25)",
+    riverMark: null,
+    zoneLine: null,
+    frame: null,
+    cars: ["#ef4444", "#facc15", "#3b82f6", "#f97316"],
+    wheel: "#222",
+    window: "rgba(255,255,255,0.6)",
+    truck: "#9ca3af",
+    truckCab: "#6b7280",
+    truckStripe: null,
+    log: "#8b5a2b",
+    logGrain: "#5c3a1a",
+    turtle: "#16a34a",
+    turtleShell: "#14532d",
+    turtleSubmerged: "rgba(74,222,128,0.35)",
+    submergedDash: [],
+    timeHigh: "#22c55e",
+    timeMid: "#facc15",
+    timeLow: "#ef4444",
+    timeTrack: "#1f2937",
+    timeSegment: 0,
+    frog: "#4ade80",
+    frogDark: "#15803d",
+    eyeWhite: "#fff",
+    eyePupil: "#000",
+    glow: 0,
+    tube: null,
+    edge: null,
+    edgeWidth: 0,
+    chunky: false,
+  },
+  // Synthwave: tubos de neón huecos con glow fuerte sobre fondo violeta,
+  // marco y límites de zona magenta. Río azul oscuro con oleaje cyan vs.
+  // asfalto violeta con rayas magenta. Rana verde lima, tortugas cyan,
+  // troncos naranja, camiones violeta; la tortuga sumergida es un anillo
+  // tenue punteado y sin glow.
+  neon: {
+    background: "#0b0016",
+    goalBank: "#1a0038",
+    goal: "#12002a",
+    goalBorder: "#ff2bd6",
+    river: "#00143a",
+    safe: "#1f0040",
+    road: "#12002a",
+    laneMark: "rgba(255,43,214,0.55)",
+    riverMark: "rgba(0,245,255,0.3)",
+    zoneLine: "#ff2bd6",
+    frame: "#ff2bd6",
+    cars: ["#ff3864", "#f5ff00", "#00f5ff", "#ff8a00"],
+    wheel: "#4b1d7a",
+    window: "rgba(255,255,255,0.85)",
+    truck: "#b967ff",
+    truckCab: "#ff2bd6",
+    truckStripe: null,
+    log: "#ff8a00",
+    logGrain: "rgba(255,138,0,0.6)",
+    turtle: "#00f5ff",
+    turtleShell: "rgba(0,245,255,0.7)",
+    turtleSubmerged: "rgba(0,245,255,0.3)",
+    submergedDash: [4, 6],
+    timeHigh: "#00ff88",
+    timeMid: "#f5ff00",
+    timeLow: "#ff3864",
+    timeTrack: "#1f0040",
+    timeSegment: 0,
+    frog: "#39ff14",
+    frogDark: "#39ff14",
+    eyeWhite: "#fff",
+    eyePupil: "#0b0016",
+    glow: 16,
+    tube: { lineWidth: 3, fillAlpha: 0.14, core: "rgba(255,255,255,0.85)" },
+    edge: null,
+    edgeWidth: 0,
+    chunky: false,
+  },
+  // 6 tonos NES, sin glow ni alpha, bordes negros duros. Río azul con
+  // oleaje blanco vs. asfalto negro; coches rojo/blanco de 1–2 celdas vs.
+  // camiones ocre rayados con cabina blanca; troncos ocre rectos vs.
+  // tortugas rojas octogonales (como el arcade); la sumergida queda como
+  // anillo blanco punteado. Barra de tiempo en bloques.
+  retro: {
+    background: NES.black,
+    goalBank: NES.green,
+    goal: NES.black,
+    goalBorder: NES.white,
+    river: NES.blue,
+    safe: NES.ochre,
+    road: NES.black,
+    laneMark: NES.white,
+    riverMark: NES.white,
+    zoneLine: null,
+    frame: NES.white,
+    cars: [NES.red, NES.white],
+    wheel: NES.white,
+    window: NES.blue,
+    truck: NES.ochre,
+    truckCab: NES.white,
+    truckStripe: NES.black,
+    log: NES.ochre,
+    logGrain: NES.black,
+    turtle: NES.red,
+    turtleShell: NES.black,
+    turtleSubmerged: NES.white,
+    submergedDash: [4, 4],
+    timeHigh: NES.green,
+    timeMid: NES.ochre,
+    timeLow: NES.red,
+    timeTrack: NES.blue,
+    timeSegment: 20,
+    frog: NES.green,
+    frogDark: NES.green,
+    eyeWhite: NES.white,
+    eyePupil: NES.black,
+    glow: 0,
+    tube: null,
+    edge: NES.black,
+    edgeWidth: 2,
+    chunky: true,
+  },
 };
 
 /** Ciclo de inmersión de las tortugas: visibles 3s, sumergidas 1,5s. */
@@ -230,9 +400,12 @@ interface Frog {
   riding: Entity | null;
 }
 
-export const createFroggerEngine: EngineFactory = (canvas, onState) => {
+export const createFroggerEngine: EngineFactory = (canvas, onState, options) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
+
+  /** Paleta activa — solo visual; `setSkin` la reasigna en vivo. */
+  let palette: FroggerPalette = SKINS[options?.skin ?? DEFAULT_SKIN] ?? SKINS[DEFAULT_SKIN];
 
   // ── Input ────────────────────────────────────────────────────────────
   /** Un único salto pendiente: el pedido durante una animación se ejecuta
@@ -508,11 +681,74 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
   }
 
   // ── Draw ────────────────────────────────────────────────────────────
+  // Todo color sale de `palette`. Cómo se pinta cada entidad depende de la
+  // skin, no de `if`s sueltos: relleno plano (CLÁSICO), tubo de neón hueco
+  // con glow (NEÓN) o relleno sólido con borde duro (RETRO) — ver `paint`.
+
+  /** Pinta la figura que arma `path` con `color` según la skin activa. */
+  function paint(color: string, path: () => void) {
+    const c = ctx!;
+    const tube = palette.tube;
+    c.beginPath();
+    path();
+    if (tube) {
+      c.globalAlpha = tube.fillAlpha;
+      c.fillStyle = color;
+      c.fill();
+      c.globalAlpha = 1;
+      if (palette.glow > 0) {
+        c.shadowColor = color;
+        c.shadowBlur = palette.glow;
+      }
+      c.strokeStyle = color;
+      c.lineWidth = tube.lineWidth;
+      c.stroke();
+      c.shadowBlur = 0;
+      c.strokeStyle = tube.core;
+      c.lineWidth = 1;
+      c.stroke();
+      return;
+    }
+    c.fillStyle = color;
+    c.fill();
+    if (palette.edge) {
+      c.strokeStyle = palette.edge;
+      c.lineWidth = palette.edgeWidth;
+      c.stroke();
+    }
+  }
+
+  /** Activa el glow de la skin (si tiene) con `color`; `noGlow` lo apaga. */
+  function glowOn(color: string) {
+    if (palette.glow <= 0) return;
+    ctx!.shadowColor = color;
+    ctx!.shadowBlur = palette.glow;
+  }
+
+  function noGlow() {
+    ctx!.shadowBlur = 0;
+  }
+
+  /** Octógono de radio `r` (silueta de píxel para tortugas en RETRO). */
+  function octagonPath(cx: number, cy: number, r: number) {
+    const c = ctx!;
+    const k = r * 0.41;
+    c.moveTo(cx - k, cy - r);
+    c.lineTo(cx + k, cy - r);
+    c.lineTo(cx + r, cy - k);
+    c.lineTo(cx + r, cy + k);
+    c.lineTo(cx + k, cy + r);
+    c.lineTo(cx - k, cy + r);
+    c.lineTo(cx - r, cy + k);
+    c.lineTo(cx - r, cy - k);
+    c.closePath();
+  }
+
   function rowColor(row: number): string {
-    if (row === ROW_GOALS) return COLORS.goalBank;
-    if (row === ROW_SAFE_MID || row === ROW_START) return COLORS.safe;
-    if (isRiverRow(row)) return COLORS.river;
-    return COLORS.road;
+    if (row === ROW_GOALS) return palette.goalBank;
+    if (row === ROW_SAFE_MID || row === ROW_START) return palette.safe;
+    if (isRiverRow(row)) return palette.river;
+    return palette.road;
   }
 
   /** Barra de tiempo en la franja negra bajo la cuadrícula (fuera del
@@ -521,10 +757,19 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     const c = ctx!;
     const frac = timeLeft / tripTime(level);
     const y = OFFSET_Y + GRID_H + 5;
-    c.fillStyle = COLORS.timeTrack;
+    c.fillStyle = palette.timeTrack;
     c.fillRect(OFFSET_X, y, GRID_W, 10);
-    c.fillStyle = frac > 0.5 ? COLORS.timeHigh : frac > 0.25 ? COLORS.timeMid : COLORS.timeLow;
+    const color = frac > 0.5 ? palette.timeHigh : frac > 0.25 ? palette.timeMid : palette.timeLow;
+    c.fillStyle = color;
+    glowOn(color);
     c.fillRect(OFFSET_X, y, GRID_W * frac, 10);
+    noGlow();
+    // RETRO: la barra se corta en bloques, como un medidor de 8 bits.
+    const seg = palette.timeSegment;
+    if (seg > 0) {
+      c.fillStyle = palette.timeTrack;
+      for (let x = seg; x < GRID_W; x += seg) c.fillRect(OFFSET_X + x - 1, y, 2, 10);
+    }
   }
 
   function drawZones() {
@@ -533,8 +778,18 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       c.fillStyle = rowColor(row);
       c.fillRect(0, row * CELL, GRID_W, CELL);
     }
+    // Oleaje del río: separa el agua del asfalto también por textura.
+    if (palette.riverMark) {
+      c.fillStyle = palette.riverMark;
+      for (let row = ROW_RIVER_TOP; row <= ROW_RIVER_BOT; row++) {
+        const shift = row % 2 === 0 ? 4 : 24;
+        for (let col = 0; col < COLS; col++) {
+          c.fillRect(col * CELL + shift, row * CELL + 18, 12, 2);
+        }
+      }
+    }
     // Líneas discontinuas entre carriles de carretera
-    c.strokeStyle = COLORS.laneMark;
+    c.strokeStyle = palette.laneMark;
     c.lineWidth = 2;
     c.setLineDash([16, 16]);
     for (let row = ROW_ROAD_TOP + 1; row <= ROW_ROAD_BOT; row++) {
@@ -544,36 +799,61 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       c.stroke();
     }
     c.setLineDash([]);
+    // Límites entre zonas (bocas | río | franja segura | carretera | base)
+    if (palette.zoneLine) {
+      c.strokeStyle = palette.zoneLine;
+      c.lineWidth = 2;
+      glowOn(palette.zoneLine);
+      c.beginPath();
+      for (const row of [ROW_RIVER_TOP, ROW_SAFE_MID, ROW_ROAD_TOP, ROW_START]) {
+        c.moveTo(0, row * CELL);
+        c.lineTo(GRID_W, row * CELL);
+      }
+      c.stroke();
+      noGlow();
+    }
     // Bocas destino
     GOAL_COLS.forEach((col, i) => {
       const x = col * CELL;
-      c.fillStyle = COLORS.goal;
+      c.fillStyle = palette.goal;
       c.fillRect(x, 4, CELL * 2, CELL - 4);
-      c.strokeStyle = COLORS.goalBorder;
+      c.strokeStyle = palette.goalBorder;
       c.lineWidth = 2;
+      glowOn(palette.goalBorder);
       c.strokeRect(x + 1, 5, CELL * 2 - 2, CELL - 6);
+      noGlow();
       if (goalsFilled[i]) drawFrogAt(col + 0.5, ROW_GOALS, "down", false);
     });
   }
 
+  /** Marco alrededor de la cuadrícula (NEÓN con glow, RETRO duro). */
+  function drawFrame() {
+    if (!palette.frame) return;
+    const c = ctx!;
+    c.strokeStyle = palette.frame;
+    c.lineWidth = 2;
+    glowOn(palette.frame);
+    c.strokeRect(-2, -2, GRID_W + 4, GRID_H + 4);
+    noGlow();
+  }
+
   function drawCar(x: number, y: number, w: number, color: string, dir: 1 | -1) {
     const c = ctx!;
-    c.fillStyle = COLORS.wheel;
+    c.fillStyle = palette.wheel;
     for (const wx of [x + 6, x + w - 14]) {
       c.fillRect(wx, y + 4, 8, 6);
       c.fillRect(wx, y + CELL - 10, 8, 6);
     }
-    c.fillStyle = color;
-    c.fillRect(x + 2, y + 8, w - 4, CELL - 16);
+    paint(color, () => c.rect(x + 2, y + 8, w - 4, CELL - 16));
     // Parabrisas hacia el sentido de marcha
-    c.fillStyle = COLORS.window;
+    c.fillStyle = palette.window;
     const wsX = dir === 1 ? x + w - 14 : x + 6;
     c.fillRect(wsX, y + 12, 8, CELL - 24);
   }
 
   function drawTruck(x: number, y: number, w: number, dir: 1 | -1) {
     const c = ctx!;
-    c.fillStyle = COLORS.wheel;
+    c.fillStyle = palette.wheel;
     for (const wx of [x + 6, x + w / 2 - 4, x + w - 14]) {
       c.fillRect(wx, y + 3, 8, 6);
       c.fillRect(wx, y + CELL - 9, 8, 6);
@@ -581,21 +861,23 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     const cabW = CELL - 8;
     const cabX = dir === 1 ? x + w - cabW - 2 : x + 2;
     const boxX = dir === 1 ? x + 2 : x + cabW + 4;
-    c.fillStyle = COLORS.truck;
-    c.fillRect(boxX, y + 6, w - cabW - 6, CELL - 12);
-    c.fillStyle = COLORS.truckCab;
-    c.fillRect(cabX, y + 8, cabW, CELL - 16);
-    c.fillStyle = COLORS.window;
+    const boxW = w - cabW - 6;
+    paint(palette.truck, () => c.rect(boxX, y + 6, boxW, CELL - 12));
+    // RETRO: rayas de carga — el camión no se confunde con un coche largo.
+    if (palette.truckStripe) {
+      c.fillStyle = palette.truckStripe;
+      for (let sx = boxX + 10; sx < boxX + boxW - 6; sx += 10) c.fillRect(sx, y + 10, 2, CELL - 20);
+    }
+    paint(palette.truckCab, () => c.rect(cabX, y + 8, cabW, CELL - 16));
+    c.fillStyle = palette.window;
     c.fillRect(dir === 1 ? cabX + cabW - 10 : cabX + 2, y + 12, 8, CELL - 24);
   }
 
   function drawLog(x: number, y: number, w: number) {
     const c = ctx!;
-    c.fillStyle = COLORS.log;
-    c.beginPath();
-    c.roundRect(x + 1, y + 5, w - 2, CELL - 10, 12);
-    c.fill();
-    c.strokeStyle = COLORS.logGrain;
+    const radius = palette.chunky ? 0 : 12;
+    paint(palette.log, () => c.roundRect(x + 1, y + 5, w - 2, CELL - 10, radius));
+    c.strokeStyle = palette.logGrain;
     c.lineWidth = 2;
     for (const gy of [y + 14, y + CELL - 14]) {
       c.beginPath();
@@ -607,26 +889,31 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
 
   function drawTurtles(x: number, y: number, width: number, submerged: boolean) {
     const c = ctx!;
+    const shape = (cx: number, cy: number, r: number) => {
+      if (palette.chunky) octagonPath(cx, cy, r);
+      else c.arc(cx, cy, r, 0, Math.PI * 2);
+    };
     for (let i = 0; i < width; i++) {
       const cx = x + i * CELL + CELL / 2;
       const cy = y + CELL / 2;
       if (submerged) {
-        c.strokeStyle = COLORS.turtleSubmerged;
+        // Hundida: solo un anillo tenue/punteado, sin relleno ni glow —
+        // tiene que leerse como "no sostiene" en las 3 skins.
+        c.strokeStyle = palette.turtleSubmerged;
         c.lineWidth = 2;
+        c.setLineDash(palette.submergedDash);
         c.beginPath();
-        c.arc(cx, cy, 14, 0, Math.PI * 2);
+        shape(cx, cy, 14);
         c.stroke();
+        c.setLineDash([]);
         continue;
       }
-      c.fillStyle = COLORS.turtle;
-      c.beginPath();
-      c.arc(cx, cy, 15, 0, Math.PI * 2);
-      c.fill();
+      paint(palette.turtle, () => shape(cx, cy, 15));
       // Escamas del caparazón
-      c.strokeStyle = COLORS.turtleShell;
+      c.strokeStyle = palette.turtleShell;
       c.lineWidth = 2;
       c.beginPath();
-      c.arc(cx, cy, 8, 0, Math.PI * 2);
+      shape(cx, cy, 8);
       for (let k = 0; k < 6; k++) {
         const a = (k * Math.PI) / 3;
         c.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8);
@@ -643,7 +930,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
         const x = e.col * CELL;
         const w = e.width * CELL;
         if (e.type === "car")
-          drawCar(x, y, w, COLORS.cars[(lane.row + i) % COLORS.cars.length], lane.dir);
+          drawCar(x, y, w, palette.cars[(lane.row + i) % palette.cars.length], lane.dir);
         else if (e.type === "truck") drawTruck(x, y, w, lane.dir);
         else if (e.type === "log") drawLog(x, y, w);
         else drawTurtles(x, y, e.width, !!e.submerged);
@@ -657,29 +944,30 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     const c = ctx!;
     const cx = col * CELL + CELL / 2;
     const cy = row * CELL + CELL / 2;
-    const angle = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 }[facing];
+    const angle = {
+      up: 0,
+      right: Math.PI / 2,
+      down: Math.PI,
+      left: -Math.PI / 2,
+    }[facing];
     c.save();
     c.translate(cx, cy);
     c.rotate(angle);
     // Patas: extendidas durante el salto
     const reach = jumping ? 16 : 11;
-    c.fillStyle = COLORS.frogDark;
     for (const sx of [-1, 1]) {
-      c.fillRect(sx * reach - 3, -12, 6, 8);
-      c.fillRect(sx * reach - 3, 5, 6, 8);
+      paint(palette.frogDark, () => c.rect(sx * reach - 3, -12, 6, 8));
+      paint(palette.frogDark, () => c.rect(sx * reach - 3, 5, 6, 8));
     }
     // Cuerpo: elipse 28×24
-    c.fillStyle = COLORS.frog;
-    c.beginPath();
-    c.ellipse(0, 0, 14, 12, 0, 0, Math.PI * 2);
-    c.fill();
+    paint(palette.frog, () => c.ellipse(0, 0, 14, 12, 0, 0, Math.PI * 2));
     // Ojos
     for (const sx of [-1, 1]) {
-      c.fillStyle = COLORS.eyeWhite;
+      c.fillStyle = palette.eyeWhite;
       c.beginPath();
       c.arc(sx * 6, -8, 4, 0, Math.PI * 2);
       c.fill();
-      c.fillStyle = COLORS.eyePupil;
+      c.fillStyle = palette.eyePupil;
       c.beginPath();
       c.arc(sx * 6, -9, 2, 0, Math.PI * 2);
       c.fill();
@@ -689,7 +977,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
 
   function draw() {
     const c = ctx!;
-    c.fillStyle = COLORS.background;
+    c.fillStyle = palette.background;
     c.fillRect(0, 0, W, H);
     c.save();
     c.translate(OFFSET_X, OFFSET_Y);
@@ -712,6 +1000,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     c.clip();
     drawFrogAt(frogCol, frogRow, frog.facing, frog.animating);
     c.restore();
+    drawFrame();
     c.restore();
     drawTimeBar();
   }
@@ -771,6 +1060,11 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
         rafId = requestAnimationFrame(loop);
       }
       reportState();
+    },
+    setSkin(skin: SkinId) {
+      palette = SKINS[skin] ?? SKINS[DEFAULT_SKIN];
+      // En pausa no hay frames corriendo: redibuja una vez para que se vea.
+      if (rafId === null) draw();
     },
     destroy() {
       if (rafId !== null) cancelAnimationFrame(rafId);
