@@ -61,7 +61,7 @@ Sin tablas nuevas ni SQL — reusa `games`/`scores`. La fila existente:
 | Bonus de tiempo al ocupar una boca                    | +10 × segundos enteros restantes |
 | Completar la ronda (5 bocas)                          | +200                             |
 
-**`maxPlausibleScore`: `100_000`** (techo de cordura — el juego no tiene final). Máximo teórico por ronda: 13 filas × 10 + 5 × (50 + 15 × 10) + 200 = 1.330, decreciente con el nivel porque el tiempo baja; 100.000 son ~75 rondas perfectas.
+**`maxPlausibleScore`: `100_000`** (techo de cordura — el juego no tiene final). Máximo teórico por ronda: 13 filas × 10 + 5 × (50 + 30 × 10) + 200 = 2.080, decreciente con el nivel porque el tiempo baja; 100.000 son ~48 rondas perfectas.
 
 **Mapeo a `EngineState`:**
 
@@ -73,7 +73,7 @@ Sin tablas nuevas ni SQL — reusa `games`/`scores`. La fila existente:
 | `badge` | `{ label: "TIEMPO", value: String(segundos restantes, redondeado hacia arriba) }`.                                                                   |
 | `phase` | `"paused"` si `isPaused`; `"gameover"` si `lives === 0` o tras `endGame()`; si no, `"playing"`.                                                      |
 
-**Temporizador:** se reinicia en cada viaje de la rana (al arrancar, al morir y al ocupar una boca). Duración `max(8, 16 - level)` s → 15 s en el nivel 1, 1 s menos por nivel, mínimo 8 s. Se dibuja como barra en la franja inferior, verde → amarillo → rojo.
+**Temporizador:** se reinicia en cada viaje de la rana (al arrancar, al morir y al ocupar una boca). Duración `max(8, 31 - level)` s → 30 s en el nivel 1 (subido de 15 s durante la implementación, a pedido), 1 s menos por nivel, mínimo 8 s. Se dibuja como barra en la franja inferior, verde → amarillo → rojo.
 
 **Velocidades base (nivel 1), en celdas/s:** carretera 2,25–6 (equivale a 1,5–4 px/frame a 60 fps), río 1,5–4,5 (1–3 px/frame); sentidos alternos por carril; huecos de al menos 1 celda entre entidades.
 
@@ -144,7 +144,7 @@ flowchart LR
 - **Sí: id `ranaria`, no `frogger`.** El catálogo ya tiene RANARIA ("Cruza la autopista de pixeles", ARCADE, `cover-rana`, `green`) como el Frogger de la plataforma, sin motor. Crear `frogger` duplicaría el juego; además `lime` no pasa el `check` de `games.color`.
 - **Sí: motor detrás de `EngineFactory`, no componente React con props.** Es el contrato de todos los juegos; el reproductor común ya da HUD, pausa, modal, guardado con sesión y gamepad táctil.
 - **Sí: cuadrícula 16 × 14 de 40 px centrada (letterbox) en el arena 800 × 600.** Conserva el diseño original; las franjas negras alojan la barra de tiempo.
-- **Sí: temporizador por viaje, no por ronda.** 15 s para las 5 bocas de una ronda serían imposibles; por viaje es la mecánica original y la que el spec describía al reiniciarlo al morir.
+- **Sí: temporizador por viaje, no por ronda.** Un único reloj para las 5 bocas de una ronda sería imposible de cumplir; por viaje es la mecánica original y la que el spec describía al reiniciarlo al morir.
 - **Sí: +10 solo por filas nuevas de la ronda**, como decía el spec original (impide farmear yendo y viniendo).
 - **Sí: `maxPlausibleScore = 100_000`** como techo de cordura (juego sin final), mismo criterio que serpentina.
 - **Sí: primitivas canvas, saltos discretos, 3 vidas, tortugas con inmersión, 5 bocas** — sin cambios respecto del spec original.

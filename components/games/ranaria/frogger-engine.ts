@@ -43,13 +43,19 @@ const HOP_MS = 120;
 /** Margen horizontal (en celdas) del cuerpo de la rana para chocar con un
  * vehículo — evita muertes por un roce de píxeles con la celda vecina. */
 const FROG_HIT_INSET = 0.15;
-/** Temporizador del nivel 1 (s); el paso 5 lo hace bajar con el nivel. */
-const BASE_TIME_S = 15;
+/** Temporizador por viaje: 30 s en el nivel 1, 1 s menos por nivel, mínimo 8 s. */
+const BASE_TIME_S = 30;
+const MIN_TIME_S = 8;
+
+function tripTime(level: number): number {
+  return Math.max(MIN_TIME_S, BASE_TIME_S + 1 - level);
+}
 
 // Puntuación (spec, Modelo de datos) — todo entero.
 const PTS_NEW_ROW = 10;
 const PTS_GOAL = 50;
 const PTS_PER_SECOND_LEFT = 10;
+const PTS_ROUND = 200;
 
 /** Las 5 bocas destino: columna izquierda de cada una (ocupan 2 columnas),
  * separadas por 1 columna de orilla en los bordes y 2 entre bocas. */
@@ -74,6 +80,10 @@ const COLORS = {
   turtle: "#16a34a",
   turtleShell: "#14532d",
   turtleSubmerged: "rgba(74,222,128,0.35)",
+  timeHigh: "#22c55e",
+  timeMid: "#facc15",
+  timeLow: "#ef4444",
+  timeTrack: "#1f2937",
   frog: "#4ade80",
   frogDark: "#15803d",
   eyeWhite: "#fff",
@@ -228,7 +238,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
    * allá suma puntos, así ir y venir no se puede farmear. */
   let bestRow = ROW_START;
   /** Segundos restantes del viaje actual de la rana. */
-  let timeLeft = BASE_TIME_S;
+  let timeLeft = tripTime(1);
 
   function makeFrog(): Frog {
     return {
@@ -255,7 +265,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     frog = makeFrog();
     pendingDir = null;
     bestRow = ROW_START;
-    timeLeft = BASE_TIME_S;
+    timeLeft = tripTime(level);
   }
 
   // ── Reporte de estado a React ──────────────────────────────────────
@@ -268,7 +278,13 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
   }
 
   function reportState() {
-    const next: EngineState = { score, lives, level, phase: currentPhase() };
+    const next: EngineState = {
+      score,
+      lives,
+      level,
+      phase: currentPhase(),
+      badge: { label: "TIEMPO", value: String(Math.ceil(timeLeft)) },
+    };
     const prev = lastReported;
     const changed =
       !prev ||
@@ -361,10 +377,29 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
   function respawnFrog() {
     frog = makeFrog();
     pendingDir = null;
-    timeLeft = BASE_TIME_S;
+    timeLeft = tripTime(level);
   }
 
+  /** Resta una vida: con vidas restantes la rana vuelve al inicio; sin
+   * vidas, termina la partida (el shell guarda el score). */
   function killFrog() {
+    lives = Math.max(0, lives - 1);
+    if (lives === 0) {
+      internalPhase = "gameover";
+      pendingDir = null;
+      return;
+    }
+    respawnFrog();
+  }
+
+  /** Las 5 bocas llenas: bonus, nivel nuevo con carriles más rápidos y
+   * menos tiempo, bocas vacías y filas a estrenar otra vez. */
+  function completeRound() {
+    score += PTS_ROUND;
+    level += 1;
+    lanes = buildLanes(level);
+    goalsFilled = GOAL_COLS.map(() => false);
+    bestRow = ROW_START;
     respawnFrog();
   }
 
@@ -382,7 +417,8 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     }
     goalsFilled[i] = true;
     score += PTS_GOAL + PTS_PER_SECOND_LEFT * Math.floor(timeLeft);
-    respawnFrog();
+    if (goalsFilled.every(Boolean)) completeRound();
+    else respawnFrog();
   }
 
   function updateFrog(dt: number) {
@@ -425,16 +461,30 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       return;
     }
     updateLanes(dt);
-    updateFrog(dt);
+    timeLeft = Math.max(0, timeLeft - dt);
+    if (timeLeft === 0) killFrog();
+    else updateFrog(dt);
     reportState();
   }
 
   // ── Draw ────────────────────────────────────────────────────────────
   function rowColor(row: number): string {
     if (row === ROW_GOALS) return COLORS.goalBank;
-    if (row >= ROW_RIVER_TOP && row <= ROW_RIVER_BOT) return COLORS.river;
-    if (row >= ROW_ROAD_TOP && row <= ROW_ROAD_BOT) return COLORS.road;
-    return COLORS.safe; // ROW_SAFE_MID y ROW_START
+    if (row === ROW_SAFE_MID || row === ROW_START) return COLORS.safe;
+    if (isRiverRow(row)) return COLORS.river;
+    return COLORS.road;
+  }
+
+  /** Barra de tiempo en la franja negra bajo la cuadrícula (fuera del
+   * `translate`): verde → amarillo → rojo según lo que queda. */
+  function drawTimeBar() {
+    const c = ctx!;
+    const frac = timeLeft / tripTime(level);
+    const y = OFFSET_Y + GRID_H + 5;
+    c.fillStyle = COLORS.timeTrack;
+    c.fillRect(OFFSET_X, y, GRID_W, 10);
+    c.fillStyle = frac > 0.5 ? COLORS.timeHigh : frac > 0.25 ? COLORS.timeMid : COLORS.timeLow;
+    c.fillRect(OFFSET_X, y, GRID_W * frac, 10);
   }
 
   function drawZones() {
@@ -616,6 +666,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     const frogRow = frog.animating ? frog.fromRow + (frog.targetRow - frog.fromRow) * t : frog.row;
     drawFrogAt(frogCol, frogRow, frog.facing, frog.animating);
     c.restore();
+    drawTimeBar();
   }
 
   // ── Loop principal ──────────────────────────────────────────────────
