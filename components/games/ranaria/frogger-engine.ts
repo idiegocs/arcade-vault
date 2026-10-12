@@ -182,7 +182,7 @@ const LANE_SPECS: LaneSpec[] = [
   { row: 6, type: "turtle", width: 3, count: 4, speed: 1.8, dir: -1 },
   // Carretera (filas 8–12)
   { row: 8, type: "truck", width: 3, count: 2, speed: 2.6, dir: -1 },
-  { row: 9, type: "car", width: 1, count: 2, speed: 6.0, dir: 1 },
+  { row: 9, type: "car", width: 1, count: 2, speed: 4.0, dir: 1 },
   { row: 10, type: "car", width: 2, count: 3, speed: 3.75, dir: -1 },
   { row: 11, type: "car", width: 1, count: 3, speed: 3.0, dir: 1 },
   { row: 12, type: "car", width: 1, count: 3, speed: 2.25, dir: -1 },
@@ -225,6 +225,9 @@ interface Frog {
   targetCol: number;
   targetRow: number;
   facing: Direction;
+  /** Tronco/tortugas que la llevan en el río: si salen por un borde y
+   * reaparecen por el otro, la rana viaja con ellos. */
+  riding: Entity | null;
 }
 
 export const createFroggerEngine: EngineFactory = (canvas, onState) => {
@@ -275,6 +278,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       targetCol: START_COL,
       targetRow: ROW_START,
       facing: "up",
+      riding: null,
     };
   }
 
@@ -328,8 +332,14 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       for (const e of lane.entities) {
         e.col += lane.speed * lane.dir * dt;
         const span = wrapSpan(e.width);
-        if (lane.dir === 1 && e.col >= COLS) e.col -= span;
-        else if (lane.dir === -1 && e.col <= -e.width) e.col += span;
+        let shift = 0;
+        if (lane.dir === 1 && e.col >= COLS) shift = -span;
+        else if (lane.dir === -1 && e.col <= -e.width) shift = span;
+        if (shift !== 0) {
+          e.col += shift;
+          // La rana montada reaparece del otro lado junto con su tronco.
+          if (frog.riding === e) frog.col += shift;
+        }
         if (e.type === "turtle") {
           e.diveT = ((e.diveT ?? 0) + dt) % TURTLE_CYCLE_S;
           e.submerged = e.diveT >= TURTLE_UP_S;
@@ -354,6 +364,7 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
       return;
     frog.animating = true;
     frog.animT = 0;
+    frog.riding = null;
     playSound("hop");
     frog.fromCol = frog.col;
     frog.fromRow = frog.row;
@@ -475,13 +486,11 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
         killFrog("splash");
         return;
       }
+      frog.riding = support;
       const lane = laneAt(frog.row)!;
       frog.col += lane.speed * lane.dir * dt;
-      const center = frog.col + 0.5;
-      if (center < 0 || center > COLS) {
-        killFrog("splash");
-        return;
-      }
+    } else {
+      frog.riding = null;
     }
     tryStartHop();
   }
@@ -695,7 +704,14 @@ export const createFroggerEngine: EngineFactory = (canvas, onState) => {
     const t = frog.animating ? Math.min(1, frog.animT / HOP_MS) : 1;
     const frogCol = frog.animating ? frog.fromCol + (frog.targetCol - frog.fromCol) * t : frog.col;
     const frogRow = frog.animating ? frog.fromRow + (frog.targetRow - frog.fromRow) * t : frog.row;
+    // Recortada a la cuadrícula: montada en un tronco que sale por un borde,
+    // la rana desaparece con él y reaparece del otro lado.
+    c.save();
+    c.beginPath();
+    c.rect(0, 0, GRID_W, GRID_H);
+    c.clip();
     drawFrogAt(frogCol, frogRow, frog.facing, frog.animating);
+    c.restore();
     c.restore();
     drawTimeBar();
   }

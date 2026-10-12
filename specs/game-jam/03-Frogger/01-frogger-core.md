@@ -21,7 +21,8 @@
 - Entidades de río: troncos (2–4 celdas) y grupos de tortugas (2–3) por carril, en loop horizontal. La rana solo sobrevive en el río encima de un tronco o de tortugas visibles, y es arrastrada por ellos. Las tortugas alternan visible (3 s) → sumergidas (1,5 s); sumergidas no sostienen.
 - Rana: saltos discretos de 1 celda en 4 direcciones (flechas + WASD), cada pulsación = un salto con animación de 120 ms. No puede salir por los bordes laterales ni por debajo de la fila 13 (el salto se ignora).
 - 5 bocas destino en la fila 0 (cada una ocupa 2 columnas). Una boca ocupada no se puede reusar en la ronda; llenar las 5 completa la ronda y empieza la siguiente.
-- Muerte por: (a) vehículo, (b) caer al agua, (c) tortuga que se sumerge bajo la rana, (d) ser arrastrada fuera del borde lateral en el río, (e) agotar el temporizador, (f) saltar a la fila 0 fuera de una boca o a una boca ya ocupada.
+- En el río, si el tronco o las tortugas que llevan a la rana salen por un borde lateral, la rana viaja con ellos y reaparece del otro lado (wrap-around; cambiado durante la implementación, a pedido — el spec original la mataba).
+- Muerte por: (a) vehículo, (b) caer al agua, (c) tortuga que se sumerge bajo la rana, (d) agotar el temporizador, (e) saltar a la fila 0 fuera de una boca o a una boca ya ocupada.
 - 3 vidas, puntaje, niveles y temporizador según el Modelo de datos.
 - `components/games/registry.ts`: entrada `ranaria` con `load` por `import()` dinámico y `maxPlausibleScore`.
 - `references/juegos-implementados.md`: `ranaria` pasa a ✅.
@@ -76,7 +77,7 @@ Sin tablas nuevas ni SQL — reusa `games`/`scores`. La fila existente:
 
 **Temporizador:** se reinicia en cada viaje de la rana (al arrancar, al morir y al ocupar una boca). Duración `max(8, 31 - level)` s → 30 s en el nivel 1 (subido de 15 s durante la implementación, a pedido), 1 s menos por nivel, mínimo 8 s. Se dibuja como barra en la franja inferior, verde → amarillo → rojo.
 
-**Velocidades base (nivel 1), en celdas/s:** carretera 2,25–6 (equivale a 1,5–4 px/frame a 60 fps), río 1,5–4,5 (1–3 px/frame); sentidos alternos por carril; huecos de al menos 1 celda entre entidades.
+**Velocidades base (nivel 1), en celdas/s:** carretera 2,25–4 (equivale a 1,5–2,7 px/frame a 60 fps; el carril más rápido, fila 9, se bajó de 6 a 4 durante la implementación, a pedido), río 1,5–4,5 (1–3 px/frame); sentidos alternos por carril; huecos de al menos 1 celda entre entidades.
 
 **Controles:**
 
@@ -95,7 +96,7 @@ Listeners en `window` sobre `e.code`; los `keydown` con `e.repeat` se ignoran (u
 | -------- | ---------- |
 | `hop`    | Cada salto que arranca. |
 | `squash` | Atropellada por un vehículo. |
-| `splash` | Cae al agua, tortuga hundida, arrastre fuera del borde, tiempo agotado o fila 0 fuera de boca / boca ocupada. |
+| `splash` | Cae al agua, tortuga hundida, tiempo agotado o fila 0 fuera de boca / boca ocupada. |
 | `goal`   | Ocupa una boca libre (si completa la ronda, suena `round` en su lugar). |
 | `round`  | Completa la ronda (5 bocas). |
 
@@ -118,7 +119,7 @@ flowchart LR
 1. **Esqueleto del motor** en `components/games/ranaria/frogger-engine.ts`: factory `createFroggerEngine`, `ctx`, constantes de cuadrícula y zonas, tipos locales (`Lane`, `Entity`, `Frog`), los 6 métodos de `EngineHandle` con las guardas de idempotencia de `motor-referencia.md` §2, loop RAF con `dt` en segundos, `reportState()` con diff. Dibuja las zonas (bocas, río, franjas seguras, carretera) y la rana quieta en la fila 13. Test manual: `npm run lint`.
 2. **Carriles**: `buildLanes(level)` con los 11 carriles y sus entidades; movimiento con wrap (al salir por un lado reaparecen por el otro); ciclo de inmersión por grupo de tortugas; dibujo con primitivas (coches con ruedas, camión con cabina, troncos con vetas, tortugas y su contorno sumergido). **Además, adelantado del paso 6** (a pedido, para que cada paso se pueda probar en el navegador): entrada `ranaria` en `components/games/registry.ts` (`import()` dinámico + `maxPlausibleScore: 100_000`) y `ranaria` → ✅ en `references/juegos-implementados.md`. Test manual: `/juegos/ranaria/jugar` muestra el motor real, todo se mueve en loop y las tortugas se sumergen.
 3. **Rana**: input de la tabla de Controles, salto discreto con animación de 120 ms (patas extendidas), límites laterales e inferior. Test manual: un salto por pulsación, sin scroll de página.
-4. **Colisiones, río y bocas**: choque con vehículos, soporte en el río (arrastre, caída al agua, tortuga sumergida, salida por el borde), llegada a la fila 0 (boca libre / ocupada / fuera de boca), puntuación de la tabla. Test manual: cada causa de muerte y cada evento de puntaje.
+4. **Colisiones, río y bocas**: choque con vehículos, soporte en el río (arrastre con wrap-around por los bordes, caída al agua, tortuga sumergida), llegada a la fila 0 (boca libre / ocupada / fuera de boca), puntuación de la tabla. Test manual: cada causa de muerte y cada evento de puntaje.
 5. **Vidas, temporizador y rondas**: `killFrog()` (resta vida, respawn, reinicia tiempo, `"gameover"` en 0), temporizador con su barra y el `badge`, `completeRound()` (+200, nivel +1, carriles más rápidos, bocas vacías). Test manual: perder las 3 vidas; completar una ronda y ver nivel 2 más rápido y con menos tiempo.
 6. **Registry y sonido** — la entrada `ranaria` se creó en el paso 2; acá se revisa que siga completa (`load`, `maxPlausibleScore`) y se le agrega `music: "turbo"`. Sonidos de la tabla con `defineSounds` en el motor (agregado durante la implementación, a pedido). Test manual: cada evento suena; con mute (♪ del nav) no suena nada; la música TURBO arranca con la partida.
 7. **Versión**: `package.json` `0.5.0` → `0.5.1` + entrada en `CHANGELOG.md`. Test manual: el Footer muestra `v0.5.1`.
@@ -136,7 +137,8 @@ flowchart LR
 - [ ] La rana no sale por los bordes laterales ni por debajo de la fila de inicio.
 - [ ] Vehículos, troncos y tortugas se mueven en loop y reaparecen por el lado opuesto.
 - [ ] Las tortugas alternan visibles (3 s) y sumergidas (1,5 s).
-- [ ] La rana muere por: vehículo, agua, tortuga sumergida, arrastre fuera del borde, tiempo agotado, fila 0 fuera de boca o boca ocupada.
+- [ ] La rana muere por: vehículo, agua, tortuga sumergida, tiempo agotado, fila 0 fuera de boca o boca ocupada.
+- [ ] Montada en un tronco o tortugas que salen por un borde, la rana reaparece del otro lado junto con ellos, sin morir.
 - [ ] En el río, la rana es arrastrada por el tronco o las tortugas que la sostienen.
 - [ ] Cada muerte resta 1 vida y devuelve la rana a la fila de inicio con el tiempo reiniciado; con 0 vidas pasa a `"gameover"` y se abre el modal del reproductor.
 - [ ] Llegar a una boca libre la marca (silueta de rana) y suma +50 + 10 × segundos restantes; la rana vuelve al inicio.
