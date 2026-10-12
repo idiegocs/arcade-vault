@@ -6,6 +6,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.5.1] - 2026-10-12
+
+Spec: [`game-jam/03-Frogger/01-frogger-core`](specs/game-jam/03-Frogger/01-frogger-core.md)
+
+### Added
+
+- Motor real del juego RANARIA (Frogger), escrito desde cero: cuadrícula de 16×14 celdas de 40px con saltos discretos (flechas + WASD), carretera de 5 carriles con coches y camiones, río de 6 carriles con troncos y tortugas que se sumergen, 5 bocas destino por ronda, 3 vidas y temporizador de 30 s por viaje (1 s menos por nivel, mínimo 8 s). Cada ronda completa sube el nivel y acelera todo un 15 %.
+- Puntuación de RANARIA: +10 por fila nueva de la ronda, +50 por boca, +10 por segundo restante al ocupar una boca y +200 por ronda completa. Techo de cordura de 100.000 en `saveScore`.
+- Sonidos en RANARIA (salto, atropello, agua, boca, ronda) y música de fondo TURBO por defecto.
+
 ## [0.5.0] - 2026-10-03
 
 Spec: [`13-musica-de-fondo-v0.5.0`](specs/13-musica-de-fondo-v0.5.0.md)
