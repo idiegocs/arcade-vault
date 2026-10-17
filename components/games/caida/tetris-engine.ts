@@ -389,11 +389,13 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
       return;
     }
     board = createBoard();
+    invalidateBoardLayer();
     current = randomPiece();
     next = randomPiece();
   }
 
   function merge() {
+    invalidateBoardLayer();
     for (let r = 0; r < current.shape.length; r++) {
       for (let c = 0; c < current.shape[r].length; c++) {
         if (current.shape[r][c]) board[current.y + r][current.x + c] = current.shape[r][c];
@@ -464,6 +466,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
 
   function initGame() {
     board = createBoard();
+    invalidateBoardLayer();
     next = randomPiece();
     spawn();
     score = 0;
@@ -478,6 +481,9 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
 
   // ── Reporte de estado a React ────────────────────────────────────────
   let lastReported: EngineState | null = null;
+  /** `lines` del último reporte: el badge es `String(lines)`, así que comparar
+   * el número equivale a comparar el texto, sin armarlo en cada frame. */
+  let lastReportedLines = -1;
 
   function currentPhase(): EnginePhase {
     if (isPaused) return "paused";
@@ -485,19 +491,27 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
     return "playing";
   }
 
+  /** Corre en cada frame: solo arma el objeto de estado si algo cambió
+   * (spec 14, sin allocaciones por frame). */
   function reportState() {
-    const badge = { label: "LÍNEAS", value: String(lines) };
-    const next: EngineState = { score, lives, level, phase: currentPhase(), badge };
+    const phase = currentPhase();
     const prev = lastReported;
     const changed =
       !prev ||
-      prev.score !== next.score ||
-      prev.lives !== next.lives ||
-      prev.level !== next.level ||
-      prev.phase !== next.phase ||
-      prev.badge?.label !== next.badge?.label ||
-      prev.badge?.value !== next.badge?.value;
+      prev.score !== score ||
+      prev.lives !== lives ||
+      prev.level !== level ||
+      prev.phase !== phase ||
+      lastReportedLines !== lines;
     if (!changed) return;
+    const next: EngineState = {
+      score,
+      lives,
+      level,
+      phase,
+      badge: { label: "LÍNEAS", value: String(lines) },
+    };
+    lastReportedLines = lines;
     lastReported = next;
     onState(next);
   }
@@ -563,20 +577,22 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
     }
   }
 
+  /** Un bloque en coordenadas locales: `(ox, oy)` es la esquina de su celda
+   * de `BLOCK`×`BLOCK` (el bloque ocupa `BLOCK - 2` con 1 px de margen). Recibe
+   * el contexto, así dibuja igual en un sprite que en el canvas (spec 14). */
   function drawBlock(
     context: CanvasRenderingContext2D,
-    x: number,
-    y: number,
+    ox: number,
+    oy: number,
     colorIndex: number,
-    size: number,
     ghost = false
   ) {
     if (!colorIndex) return;
     const style = palette.pieces[colorIndex];
     const fill = style?.fill ?? palette.fallbackFill;
-    const px = x * size + 1;
-    const py = y * size + 1;
-    const s = size - 2;
+    const px = ox + 1;
+    const py = oy + 1;
+    const s = BLOCK - 2;
 
     if (ghost && palette.ghost.kind === "outline") {
       const w = palette.ghost.width;
@@ -636,99 +652,235 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
     context.globalAlpha = 1;
   }
 
-  function drawBoardFrame() {
+  /** Fondo del tablero, grilla y marco, en coordenadas del tablero. */
+  function drawBoardFrame(c: CanvasRenderingContext2D) {
     if (palette.boardBackground) {
-      ctx!.fillStyle = palette.boardBackground;
-      ctx!.fillRect(0, 0, BOARD_W, BOARD_H);
+      c.fillStyle = palette.boardBackground;
+      c.fillRect(0, 0, BOARD_W, BOARD_H);
     }
     if (palette.gridLine) {
-      ctx!.strokeStyle = palette.gridLine;
-      ctx!.lineWidth = palette.gridLineWidth;
-      for (let c = 1; c < COLS; c++) {
-        ctx!.beginPath();
-        ctx!.moveTo(c * BLOCK, 0);
-        ctx!.lineTo(c * BLOCK, BOARD_H);
-        ctx!.stroke();
+      c.strokeStyle = palette.gridLine;
+      c.lineWidth = palette.gridLineWidth;
+      for (let col = 1; col < COLS; col++) {
+        c.beginPath();
+        c.moveTo(col * BLOCK, 0);
+        c.lineTo(col * BLOCK, BOARD_H);
+        c.stroke();
       }
       for (let r = 1; r < ROWS; r++) {
-        ctx!.beginPath();
-        ctx!.moveTo(0, r * BLOCK);
-        ctx!.lineTo(BOARD_W, r * BLOCK);
-        ctx!.stroke();
+        c.beginPath();
+        c.moveTo(0, r * BLOCK);
+        c.lineTo(BOARD_W, r * BLOCK);
+        c.stroke();
       }
     }
     if (palette.frameGlow > 0) {
-      ctx!.shadowColor = palette.frame;
-      ctx!.shadowBlur = palette.frameGlow;
+      c.shadowColor = palette.frame;
+      c.shadowBlur = palette.frameGlow;
     }
-    ctx!.strokeStyle = palette.frame;
-    ctx!.lineWidth = palette.frameWidth;
-    ctx!.strokeRect(0, 0, BOARD_W, BOARD_H);
-    ctx!.shadowBlur = 0;
+    c.strokeStyle = palette.frame;
+    c.lineWidth = palette.frameWidth;
+    c.strokeRect(0, 0, BOARD_W, BOARD_H);
+    c.shadowBlur = 0;
   }
 
-  function drawNextPreview() {
-    ctx!.save();
-    ctx!.font = palette.labelFont;
-    ctx!.fillStyle = palette.label;
-    ctx!.fillText("SIGUIENTE", NEXT_ORIGIN_X, NEXT_ORIGIN_Y - 16);
-
-    const shape = next.shape;
-    const offX = Math.floor((4 - shape[0].length) / 2);
-    const offY = Math.floor((4 - shape.length) / 2);
-    ctx!.translate(NEXT_ORIGIN_X, NEXT_ORIGIN_Y);
+  /** Parte fija de la vista previa: el texto "SIGUIENTE" y la caja (RETRO),
+   * en coordenadas del canvas. Va en `bgCache`. */
+  function drawNextFrame(c: CanvasRenderingContext2D) {
+    c.font = palette.labelFont;
+    c.fillStyle = palette.label;
+    c.fillText("SIGUIENTE", NEXT_ORIGIN_X, NEXT_ORIGIN_Y - 16);
     const box = palette.previewBox;
     if (box) {
       const side = 4 * BLOCK;
-      ctx!.fillStyle = box.fill;
-      ctx!.fillRect(-6, -6, side + 12, side + 12);
-      ctx!.strokeStyle = box.border;
-      ctx!.lineWidth = box.borderWidth;
-      ctx!.strokeRect(-6, -6, side + 12, side + 12);
+      c.fillStyle = box.fill;
+      c.fillRect(NEXT_ORIGIN_X - 6, NEXT_ORIGIN_Y - 6, side + 12, side + 12);
+      c.strokeStyle = box.border;
+      c.lineWidth = box.borderWidth;
+      c.strokeRect(NEXT_ORIGIN_X - 6, NEXT_ORIGIN_Y - 6, side + 12, side + 12);
     }
-    for (let r = 0; r < shape.length; r++) {
-      for (let c = 0; c < shape[r].length; c++) {
-        drawBlock(ctx!, offX + c, offY + r, shape[r][c], BLOCK);
-      }
-    }
-    ctx!.restore();
   }
 
-  function draw() {
-    ctx!.fillStyle = palette.background;
-    ctx!.fillRect(0, 0, W, H);
-
-    ctx!.save();
-    ctx!.translate(BOARD_OFFSET_X, BOARD_OFFSET_Y);
-    drawBoardFrame();
-
-    // tablero ya asentado
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        drawBlock(ctx!, c, r, board[r][c], BLOCK);
+  /** Bloques de la próxima pieza, con sprites, en coordenadas del canvas. */
+  function drawNextPiece(c: CanvasRenderingContext2D) {
+    const shape = next.shape;
+    const offX = Math.floor((4 - shape[0].length) / 2);
+    const offY = Math.floor((4 - shape.length) / 2);
+    for (let r = 0; r < shape.length; r++) {
+      for (let col = 0; col < shape[r].length; col++) {
+        const v = shape[r][col];
+        if (v)
+          c.drawImage(
+            blockSprites[v],
+            NEXT_ORIGIN_X + (offX + col) * BLOCK - pad,
+            NEXT_ORIGIN_Y + (offY + r) * BLOCK - pad
+          );
       }
     }
+  }
+
+  // ── Cachés de dibujo (spec 14) ──────────────────────────────────────
+  /** Margen de cada sprite de bloque: lo que se extiende el glow
+   * (≈ 1,5 × `shadowBlur`) más el borde; sin glow, solo el borde. */
+  let pad = 2;
+  /** Fondo estático completo (800×600): fondo, tablero, grilla, marco y la
+   * parte fija de la vista previa. Se arma perezosamente en `draw()`. */
+  let bgCache: HTMLCanvasElement | null = null;
+  /** Bloque de cada tipo de pieza (índice = tipo, 1..8) con su glow ya
+   * pintado, en un canvas de `BLOCK + 2·pad`. */
+  let blockSprites: HTMLCanvasElement[] = [];
+  /** Lo mismo para la pieza fantasma (alpha o contorno, según la skin). */
+  let ghostSprites: HTMLCanvasElement[] = [];
+  /** Capa del tablero asentado: `bgCache` + los bloques fijos. Solo se
+   * repinta cuando cambia `board` (pieza fijada, líneas, topout, partida
+   * nueva) o la skin; cada frame la pinta con un solo `drawImage`. */
+  let boardLayer: HTMLCanvasElement | null = null;
+  let boardLayerDirty = true;
+
+  function blockSprite(colorIndex: number, ghost: boolean): HTMLCanvasElement {
+    const cv = document.createElement("canvas");
+    cv.width = BLOCK + 2 * pad;
+    cv.height = BLOCK + 2 * pad;
+    const c = cv.getContext("2d")!;
+    c.translate(pad, pad);
+    drawBlock(c, 0, 0, colorIndex, ghost);
+    return cv;
+  }
+
+  function buildCaches() {
+    pad = palette.blockGlow > 0 ? Math.ceil(palette.blockGlow * 1.5) + 2 : 2;
+
+    const bg = document.createElement("canvas");
+    bg.width = W;
+    bg.height = H;
+    const b = bg.getContext("2d")!;
+    b.fillStyle = palette.background;
+    b.fillRect(0, 0, W, H);
+    b.translate(BOARD_OFFSET_X, BOARD_OFFSET_Y);
+    drawBoardFrame(b);
+    b.setTransform(1, 0, 0, 1, 0, 0);
+    // La vista previa queda lejos del glow del tablero: pintarla debajo de
+    // los bloques no cambia nada a la vista.
+    drawNextFrame(b);
+    bgCache = bg;
+
+    blockSprites = [];
+    ghostSprites = [];
+    for (let i = 0; i < PIECES.length; i++) {
+      blockSprites.push(blockSprite(i, false));
+      ghostSprites.push(blockSprite(i, true));
+    }
+
+    if (!boardLayer) {
+      boardLayer = document.createElement("canvas");
+      boardLayer.width = W;
+      boardLayer.height = H;
+    }
+    boardLayerDirty = true;
+  }
+
+  /** Repinta la capa del tablero asentado (reusa el mismo canvas). */
+  function renderBoardLayer() {
+    const c = boardLayer!.getContext("2d")!;
+    c.drawImage(bgCache!, 0, 0);
+    for (let r = 0; r < ROWS; r++) {
+      for (let col = 0; col < COLS; col++) {
+        const v = board[r][col];
+        if (v)
+          c.drawImage(
+            blockSprites[v],
+            BOARD_OFFSET_X + col * BLOCK - pad,
+            BOARD_OFFSET_Y + r * BLOCK - pad
+          );
+      }
+    }
+    boardLayerDirty = false;
+  }
+
+  /** Cambió `board`: la capa del tablero se repinta en el próximo `draw()`. */
+  function invalidateBoardLayer() {
+    boardLayerDirty = true;
+  }
+
+  /** Único punto de invalidación de los cachés de la skin: `setSkin` y
+   * `destroy`. Invalida también la capa del tablero. */
+  function invalidateCaches() {
+    bgCache = null;
+    blockSprites = [];
+    ghostSprites = [];
+    boardLayer = null;
+    invalidateBoardLayer();
+  }
+
+  // ── Redibujo solo con cambios (flag `dirty`, spec 14) ───────────────
+  // CAÍDA solo cambia por el tick de caída o por input, y no tiene
+  // animaciones continuas: casi todos los frames repetirían el anterior. Lo
+  // que se ve depende de la pieza actual (objeto, rotación y posición; la
+  // fantasma sale de ella y del tablero), de la próxima, del tablero
+  // (`boardLayerDirty`) y de la skin (`bgCache === null`). Se compara contra
+  // lo último dibujado, sin tocar el input ni el gameplay.
+  let drawnCurrent: Piece | null = null;
+  let drawnShape: number[][] | null = null;
+  let drawnX = 0;
+  let drawnY = 0;
+  let drawnNext: Piece | null = null;
+  /** Fuerza el próximo redibujo (p. ej. si el navegador restauró el canvas). */
+  let forceRedraw = true;
+
+  function needsRedraw(): boolean {
+    return (
+      forceRedraw ||
+      !bgCache ||
+      boardLayerDirty ||
+      current !== drawnCurrent ||
+      current.shape !== drawnShape ||
+      current.x !== drawnX ||
+      current.y !== drawnY ||
+      next !== drawnNext
+    );
+  }
+
+  const handleContextRestored = () => {
+    forceRedraw = true;
+    if (rafId === null) draw();
+  };
+  canvas.addEventListener("contextrestored", handleContextRestored);
+
+  function draw() {
+    const c = ctx!;
+    if (!bgCache) buildCaches();
+    if (boardLayerDirty) renderBoardLayer();
+    c.drawImage(boardLayer!, 0, 0);
+
+    const shape = current.shape;
+    const x0 = BOARD_OFFSET_X + current.x * BLOCK - pad;
 
     // pieza fantasma (proyección de aterrizaje)
-    const gy = ghostY();
-    for (let r = 0; r < current.shape.length; r++) {
-      for (let c = 0; c < current.shape[r].length; c++) {
-        if (current.shape[r][c])
-          drawBlock(ctx!, current.x + c, gy + r, current.shape[r][c], BLOCK, true);
+    const gy0 = BOARD_OFFSET_Y + ghostY() * BLOCK - pad;
+    for (let r = 0; r < shape.length; r++) {
+      for (let col = 0; col < shape[r].length; col++) {
+        const v = shape[r][col];
+        if (v) c.drawImage(ghostSprites[v], x0 + col * BLOCK, gy0 + r * BLOCK);
       }
     }
 
     // pieza actual
-    for (let r = 0; r < current.shape.length; r++) {
-      for (let c = 0; c < current.shape[r].length; c++) {
-        if (current.shape[r][c])
-          drawBlock(ctx!, current.x + c, current.y + r, current.shape[r][c], BLOCK);
+    const y0 = BOARD_OFFSET_Y + current.y * BLOCK - pad;
+    for (let r = 0; r < shape.length; r++) {
+      for (let col = 0; col < shape[r].length; col++) {
+        const v = shape[r][col];
+        if (v) c.drawImage(blockSprites[v], x0 + col * BLOCK, y0 + r * BLOCK);
       }
     }
 
-    ctx!.restore();
+    drawNextPiece(c);
 
-    drawNextPreview();
+    drawnCurrent = current;
+    drawnShape = shape;
+    drawnX = current.x;
+    drawnY = current.y;
+    drawnNext = next;
+    forceRedraw = false;
   }
 
   // ── Loop principal ──────────────────────────────────────────────────
@@ -739,7 +891,13 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
     const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, 0.05);
     lastTime = ts;
     update(dt);
-    draw();
+    if (needsRedraw()) draw();
+    // Tras el game over queda el último frame quieto detrás del modal y el
+    // loop se corta (spec 14); `restart()` lo vuelve a arrancar.
+    if (internalPhase === "gameover") {
+      rafId = null;
+      return;
+    }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -789,6 +947,7 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
     },
     setSkin(skin: SkinId) {
       palette = SKINS[skin] ?? SKINS[DEFAULT_SKIN];
+      invalidateCaches();
       // En pausa no hay frames corriendo: redibuja una vez para que se vea.
       if (rafId === null) draw();
     },
@@ -797,6 +956,8 @@ export const createTetrisEngine: EngineFactory = (canvas, onState, options) => {
       rafId = null;
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
+      canvas.removeEventListener("contextrestored", handleContextRestored);
+      invalidateCaches();
     },
   };
 };
