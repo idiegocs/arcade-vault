@@ -6,6 +6,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.5.3] - 2026-10-17
+
+Spec: [`14-rendimiento-motores-v0.5.2`](specs/14-rendimiento-motores-v0.5.2.md) (aplicado a CAÍDA y ROCAS)
+
+### Added
+
+- `references/rendimiento-juegos.md`: registro de las corridas de `@game-performance-booster`, con mediciones antes y después por skin.
+
+### Changed
+
+- CAÍDA dibuja menos: el fondo, el brillo de NEÓN y los bloques ya fijados se dibujan una vez y se reutilizan, y el canvas solo se redibuja cuando algo cambia. En el peor caso medido (sin GPU, CPU 4x), el trabajo por frame baja de 3,95 a 1,04 ms en NEÓN y de ~2,3 a ~1 ms en CLÁSICO y RETRO. Se ve igual en las 3 skins.
+- CAÍDA y ROCAS dejan de redibujar tras el game over: el canvas queda quieto detrás del modal hasta JUGAR DE NUEVO (ROCAS primero deja terminar la explosión de la nave).
+- ROCAS dibuja sin crear objetos por frame. El brillo en sprites del spec 14 se probó y se descartó en ROCAS: hacía NEÓN más lento.
+
 ## [0.5.2] - 2026-10-12
 
 Spec: [`14-rendimiento-motores-v0.5.2`](specs/14-rendimiento-motores-v0.5.2.md)
