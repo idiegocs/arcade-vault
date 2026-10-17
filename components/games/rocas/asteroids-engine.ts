@@ -217,9 +217,8 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
   const snap = (v: number) =>
     palette.pixelSnap > 0 ? Math.round(v / palette.pixelSnap) * palette.pixelSnap : v;
 
-  /** Pinta el path actual según `s`: relleno, trazo (con glow) y núcleo. */
-  function paint(s: Stroke) {
-    const c = ctx!;
+  /** Pinta el path actual de `c` según `s`: relleno, trazo (con glow) y núcleo. */
+  function paint(c: CanvasRenderingContext2D, s: Stroke) {
     if (s.fill) {
       c.globalAlpha = s.fill.alpha;
       c.fillStyle = s.fill.color;
@@ -240,6 +239,32 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
       c.lineWidth = 1;
       c.stroke();
     }
+  }
+
+  // Paths de cada entidad, en coordenadas locales (0, 0) de la entidad: el
+  // dibujo no depende del canvas destino (spec 14, regla 4).
+  function shipPath(c: CanvasRenderingContext2D) {
+    c.moveTo(20, 0);
+    c.lineTo(-12, -9);
+    c.lineTo(-7, 0);
+    c.lineTo(-12, 9);
+    c.closePath();
+  }
+
+  function flamePath(c: CanvasRenderingContext2D, len: number) {
+    c.moveTo(-8, -4);
+    c.lineTo(-8 - len, 0);
+    c.lineTo(-8, 4);
+  }
+
+  function asteroidPath(c: CanvasRenderingContext2D, verts: [number, number][]) {
+    c.moveTo(verts[0][0], verts[0][1]);
+    for (let i = 1; i < verts.length; i++) c.lineTo(verts[i][0], verts[i][1]);
+    c.closePath();
+  }
+
+  function boxPath(c: CanvasRenderingContext2D, r: number) {
+    c.rect(-r, -r, r * 2, r * 2);
   }
 
   // ── Input ──────────────────────────────────────────────────────────────
@@ -288,28 +313,28 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
       if (this.ttl <= 0) this.dead = true;
     }
 
-    draw() {
-      const b = palette.bullet;
+    draw(c: CanvasRenderingContext2D) {
       const x = snap(this.x);
       const y = snap(this.y);
+      const b = palette.bullet;
       if (b.glow > 0) {
-        ctx!.shadowColor = b.color;
-        ctx!.shadowBlur = b.glow;
+        c.shadowColor = b.color;
+        c.shadowBlur = b.glow;
       }
-      ctx!.fillStyle = b.color;
+      c.fillStyle = b.color;
       if (b.shape === "square") {
-        ctx!.fillRect(x - b.size, y - b.size, b.size * 2, b.size * 2);
+        c.fillRect(x - b.size, y - b.size, b.size * 2, b.size * 2);
       } else {
-        ctx!.beginPath();
-        ctx!.arc(x, y, b.size, 0, Math.PI * 2);
-        ctx!.fill();
+        c.beginPath();
+        c.arc(x, y, b.size, 0, Math.PI * 2);
+        c.fill();
       }
-      ctx!.shadowBlur = 0;
+      c.shadowBlur = 0;
       if (b.core) {
-        ctx!.fillStyle = b.core;
-        ctx!.beginPath();
-        ctx!.arc(x, y, b.size * 0.4, 0, Math.PI * 2);
-        ctx!.fill();
+        c.fillStyle = b.core;
+        c.beginPath();
+        c.arc(x, y, b.size * 0.4, 0, Math.PI * 2);
+        c.fill();
       }
     }
   }
@@ -362,19 +387,17 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
       ];
     }
 
-    draw() {
+    draw(c: CanvasRenderingContext2D) {
       const steps = palette.asteroidRotSteps;
       const step = (Math.PI * 2) / steps;
       const rot = steps > 0 ? Math.round(this.rot / step) * step : this.rot;
-      ctx!.save();
-      ctx!.translate(snap(this.x), snap(this.y));
-      ctx!.rotate(rot);
-      ctx!.beginPath();
-      ctx!.moveTo(this.verts[0][0], this.verts[0][1]);
-      for (let i = 1; i < this.verts.length; i++) ctx!.lineTo(this.verts[i][0], this.verts[i][1]);
-      ctx!.closePath();
-      paint(palette.asteroids[this.size] ?? palette.asteroids[0]);
-      ctx!.restore();
+      c.save();
+      c.translate(snap(this.x), snap(this.y));
+      c.rotate(rot);
+      c.beginPath();
+      asteroidPath(c, this.verts);
+      paint(c, palette.asteroids[this.size] ?? palette.asteroids[0]);
+      c.restore();
     }
   }
 
@@ -404,30 +427,30 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
       if (this.ttl <= 0) this.dead = true;
     }
 
-    draw() {
+    draw(c: CanvasRenderingContext2D) {
       if (this.ttl < 2 && Math.floor(this.ttl * 8) % 2 === 0) return;
       const pulse = 0.85 + Math.sin(performance.now() / 150) * 0.15;
       const pu = palette.powerUp;
       const x = snap(this.x);
       const y = snap(this.y);
-      ctx!.save();
-      ctx!.translate(x, y);
-      ctx!.rotate(Math.PI / 4);
+      c.save();
+      c.translate(x, y);
+      c.rotate(Math.PI / 4);
       const r = this.radius * pulse;
-      ctx!.beginPath();
-      ctx!.rect(-r, -r, r * 2, r * 2);
-      paint(pu.box);
-      ctx!.restore();
+      c.beginPath();
+      boxPath(c, r);
+      paint(c, pu.box);
+      c.restore();
       if (pu.textGlow > 0) {
-        ctx!.shadowColor = pu.text;
-        ctx!.shadowBlur = pu.textGlow;
+        c.shadowColor = pu.text;
+        c.shadowBlur = pu.textGlow;
       }
-      ctx!.fillStyle = pu.text;
-      ctx!.font = pu.font;
-      ctx!.textAlign = "center";
-      ctx!.textBaseline = "middle";
-      ctx!.fillText("3x", x, y);
-      ctx!.shadowBlur = 0;
+      c.fillStyle = pu.text;
+      c.font = pu.font;
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText("3x", x, y);
+      c.shadowBlur = 0;
     }
   }
 
@@ -502,31 +525,26 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
       return [new Bullet(ox, oy, this.angle)];
     }
 
-    draw() {
+    draw(c: CanvasRenderingContext2D) {
       if (this.dead) return;
       if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
-      ctx!.save();
-      ctx!.translate(snap(this.x), snap(this.y));
-      ctx!.rotate(this.angle);
+      c.save();
+      c.translate(snap(this.x), snap(this.y));
+      c.rotate(this.angle);
 
-      ctx!.beginPath();
-      ctx!.moveTo(20, 0);
-      ctx!.lineTo(-12, -9);
-      ctx!.lineTo(-7, 0);
-      ctx!.lineTo(-12, 9);
-      ctx!.closePath();
-      paint(palette.ship);
+      c.beginPath();
+      shipPath(c);
+      paint(c, palette.ship);
 
       if (this.thrusting && Math.random() > 0.35) {
-        ctx!.beginPath();
-        ctx!.moveTo(-8, -4);
-        ctx!.lineTo(-8 - rand(6, 14), 0);
-        ctx!.lineTo(-8, 4);
-        paint(palette.thrust);
+        const len = rand(6, 14);
+        c.beginPath();
+        flamePath(c, len);
+        paint(c, palette.thrust);
       }
 
-      ctx!.restore();
+      c.restore();
     }
   }
 
@@ -558,26 +576,26 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
       if (this.ttl <= 0) this.dead = true;
     }
 
-    draw() {
+    draw(c: CanvasRenderingContext2D) {
       const p = palette.particle;
-      if (p.fade) ctx!.globalAlpha = Math.max(0, this.ttl / this.life);
+      if (p.fade) c.globalAlpha = Math.max(0, this.ttl / this.life);
       if (p.glow > 0) {
-        ctx!.shadowColor = p.color;
-        ctx!.shadowBlur = p.glow;
+        c.shadowColor = p.color;
+        c.shadowBlur = p.glow;
       }
       if (p.shape === "pixel") {
-        ctx!.fillStyle = p.color;
-        ctx!.fillRect(snap(this.x) - 1, snap(this.y) - 1, p.width, p.width);
+        c.fillStyle = p.color;
+        c.fillRect(snap(this.x) - 1, snap(this.y) - 1, p.width, p.width);
       } else {
-        ctx!.strokeStyle = p.color;
-        ctx!.lineWidth = p.width;
-        ctx!.beginPath();
-        ctx!.moveTo(this.x, this.y);
-        ctx!.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
-        ctx!.stroke();
+        c.strokeStyle = p.color;
+        c.lineWidth = p.width;
+        c.beginPath();
+        c.moveTo(this.x, this.y);
+        c.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
+        c.stroke();
       }
-      ctx!.shadowBlur = 0;
-      ctx!.globalAlpha = 1;
+      c.shadowBlur = 0;
+      c.globalAlpha = 1;
     }
   }
 
@@ -663,37 +681,61 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
     return "playing"; // cubre "playing" y "dead" (respawn) internos
   }
 
+  /** Segundos del badge "3x" ya reportados (-1 = sin badge). */
+  let lastBadgeSecs = -1;
+
+  /** Compara contra lo último reportado con primitivos y solo arma el
+   * `EngineState` (y el badge) cuando algo cambió: sin allocaciones por frame. */
   function reportState() {
-    const badge =
-      ship.tripleShot > 0 ? { label: "3x", value: `${Math.ceil(ship.tripleShot)}s` } : undefined;
-    const next: EngineState = { score, lives, level, phase: currentPhase(), badge };
+    const phase = currentPhase();
+    const badgeSecs = ship.tripleShot > 0 ? Math.ceil(ship.tripleShot) : -1;
     const prev = lastReported;
-    const changed =
-      !prev ||
-      prev.score !== next.score ||
-      prev.lives !== next.lives ||
-      prev.level !== next.level ||
-      prev.phase !== next.phase ||
-      prev.badge?.value !== next.badge?.value;
-    if (!changed) return;
+    if (
+      prev &&
+      prev.score === score &&
+      prev.lives === lives &&
+      prev.level === level &&
+      prev.phase === phase &&
+      lastBadgeSecs === badgeSecs
+    )
+      return;
+    lastBadgeSecs = badgeSecs;
+    const next: EngineState = {
+      score,
+      lives,
+      level,
+      phase,
+      badge: badgeSecs >= 0 ? { label: "3x", value: `${badgeSecs}s` } : undefined,
+    };
     lastReported = next;
     onState(next);
   }
 
   // ── Update ────────────────────────────────────────────────────────────
+  /** Saca los muertos de `list` en el lugar, manteniendo el orden (en vez de
+   * `filter`, que allocaba un array nuevo por frame). */
+  function compactDead(list: { dead: boolean }[]) {
+    let j = 0;
+    for (let i = 0; i < list.length; i++) if (!list[i].dead) list[j++] = list[i];
+    list.length = j;
+  }
+
+  /** Asteroides nacidos de los impactos de este frame (se reusa entre frames). */
+  const newAsteroids: Asteroid[] = [];
+
   function update(dt: number) {
     if (internalPhase === "gameover") {
-      particles.forEach((p) => p.update(dt));
-      particles = particles.filter((p) => !p.dead);
+      for (let i = 0; i < particles.length; i++) particles[i].update(dt);
+      compactDead(particles);
       reportState();
       return;
     }
 
     if (internalPhase === "dead") {
       deadTimer -= dt;
-      particles.forEach((p) => p.update(dt));
-      particles = particles.filter((p) => !p.dead);
-      asteroids.forEach((a) => a.update(dt));
+      for (let i = 0; i < particles.length; i++) particles[i].update(dt);
+      compactDead(particles);
+      for (let i = 0; i < asteroids.length; i++) asteroids[i].update(dt);
       if (deadTimer <= 0) {
         internalPhase = "playing";
         ship.reset();
@@ -705,20 +747,21 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
     if (pressed("Space")) {
       const newBullets = ship.tryShoot();
       if (newBullets.length > 0) playSound("shoot");
-      bullets.push(...newBullets);
+      for (let i = 0; i < newBullets.length; i++) bullets.push(newBullets[i]);
     }
 
     ship.update(dt);
-    bullets.forEach((b) => b.update(dt));
-    asteroids.forEach((a) => a.update(dt));
-    particles.forEach((p) => p.update(dt));
-    powerUps.forEach((p) => p.update(dt));
+    for (let i = 0; i < bullets.length; i++) bullets[i].update(dt);
+    for (let i = 0; i < asteroids.length; i++) asteroids[i].update(dt);
+    for (let i = 0; i < particles.length; i++) particles[i].update(dt);
+    for (let i = 0; i < powerUps.length; i++) powerUps[i].update(dt);
 
-    bullets = bullets.filter((b) => !b.dead);
-    particles = particles.filter((p) => !p.dead);
-    powerUps = powerUps.filter((p) => !p.dead);
+    compactDead(bullets);
+    compactDead(particles);
+    compactDead(powerUps);
 
-    for (const p of powerUps) {
+    for (let i = 0; i < powerUps.length; i++) {
+      const p = powerUps[i];
       if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
         p.dead = true;
         ship.tripleShot = POWERUP_DURATION;
@@ -726,16 +769,19 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
       }
     }
 
-    const newAsteroids: Asteroid[] = [];
-    for (const b of bullets) {
-      for (const a of asteroids) {
+    newAsteroids.length = 0;
+    for (let bi = 0; bi < bullets.length; bi++) {
+      const b = bullets[bi];
+      for (let ai = 0; ai < asteroids.length; ai++) {
+        const a = asteroids[ai];
         if (!a.dead && !b.dead && dist(b, a) < a.radius) {
           b.dead = true;
           a.dead = true;
           playSound("impact");
           score += POINTS[a.size];
           explode(a.x, a.y, a.size * 5);
-          newAsteroids.push(...a.split());
+          const parts = a.split();
+          for (let k = 0; k < parts.length; k++) newAsteroids.push(parts[k]);
           if (!powerUpSpawned) {
             killsSinceSpawn++;
             const guaranteed = killsSinceSpawn >= 5;
@@ -747,12 +793,14 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
         }
       }
     }
-    asteroids = asteroids.filter((a) => !a.dead).concat(newAsteroids);
-    bullets = bullets.filter((b) => !b.dead);
+    compactDead(asteroids);
+    for (let k = 0; k < newAsteroids.length; k++) asteroids.push(newAsteroids[k]);
+    newAsteroids.length = 0;
+    compactDead(bullets);
 
     if (ship.invincible <= 0) {
-      for (const a of asteroids) {
-        if (dist(ship, a) < ship.radius + a.radius * 0.82) {
+      for (let i = 0; i < asteroids.length; i++) {
+        if (dist(ship, asteroids[i]) < ship.radius + asteroids[i].radius * 0.82) {
           killShip();
           break;
         }
@@ -765,48 +813,55 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
   }
 
   // ── Draw ──────────────────────────────────────────────────────────────
-  function drawBackground() {
-    ctx!.fillStyle = palette.background;
-    ctx!.fillRect(0, 0, W, H);
+  function drawBackground(c: CanvasRenderingContext2D) {
+    c.fillStyle = palette.background;
+    c.fillRect(0, 0, W, H);
     const grid = palette.grid;
     if (grid) {
-      ctx!.strokeStyle = grid.color;
-      ctx!.lineWidth = grid.width;
-      ctx!.beginPath();
+      c.strokeStyle = grid.color;
+      c.lineWidth = grid.width;
+      c.beginPath();
       for (let x = grid.spacing; x < W; x += grid.spacing) {
-        ctx!.moveTo(x, 0);
-        ctx!.lineTo(x, H);
+        c.moveTo(x, 0);
+        c.lineTo(x, H);
       }
       for (let y = grid.spacing; y < H; y += grid.spacing) {
-        ctx!.moveTo(0, y);
-        ctx!.lineTo(W, y);
+        c.moveTo(0, y);
+        c.lineTo(W, y);
       }
-      ctx!.stroke();
+      c.stroke();
     }
   }
 
-  function drawFrame() {
+  function drawFrame(c: CanvasRenderingContext2D) {
     const f = palette.frame;
     if (!f) return;
     if (f.glow > 0) {
-      ctx!.shadowColor = f.color;
-      ctx!.shadowBlur = f.glow;
+      c.shadowColor = f.color;
+      c.shadowBlur = f.glow;
     }
-    ctx!.strokeStyle = f.color;
-    ctx!.lineWidth = f.width;
-    ctx!.strokeRect(f.width / 2, f.width / 2, W - f.width, H - f.width);
-    ctx!.shadowBlur = 0;
+    c.strokeStyle = f.color;
+    c.lineWidth = f.width;
+    c.strokeRect(f.width / 2, f.width / 2, W - f.width, H - f.width);
+    c.shadowBlur = 0;
   }
 
+  // Sin cachés de dibujo, a propósito (spec 14, medido sin GPU + CPU 4x y con
+  // GPU): `bgCache` de la grilla, el marco con glow en una capa y el glow de
+  // nave, llama, balas y power-up en sprites no bajaron el trabajo por frame
+  // (dentro del ruido, o hasta +8 % con GPU); el halo rotado de los asteroides
+  // y las estelas en sprites lo subieron (~+35 %). La escena es casi toda
+  // vacía y Skia resuelve barato el blur de figuras chicas y de rectángulos.
   function draw() {
-    drawBackground();
+    const c = ctx!;
+    drawBackground(c);
 
-    particles.forEach((p) => p.draw());
-    asteroids.forEach((a) => a.draw());
-    powerUps.forEach((p) => p.draw());
-    bullets.forEach((b) => b.draw());
-    ship.draw();
-    drawFrame();
+    for (let i = 0; i < particles.length; i++) particles[i].draw(c);
+    for (let i = 0; i < asteroids.length; i++) asteroids[i].draw(c);
+    for (let i = 0; i < powerUps.length; i++) powerUps[i].draw(c);
+    for (let i = 0; i < bullets.length; i++) bullets[i].draw(c);
+    ship.draw(c);
+    drawFrame(c);
   }
 
   // ── Loop principal ────────────────────────────────────────────────────
@@ -818,6 +873,14 @@ export const createAsteroidsEngine: EngineFactory = (canvas, onState, options) =
     lastTime = ts;
     update(dt);
     draw();
+    // Tras el game over el loop se corta y queda el último frame quieto
+    // detrás del modal (spec 14). Antes se deja terminar la explosión de la
+    // nave (las partículas viven ≤ 1,1 s), que es lo único que `update` sigue
+    // animando en "gameover". `restart()` rearma el rAF.
+    if (internalPhase === "gameover" && particles.length === 0) {
+      rafId = null;
+      return;
+    }
     rafId = requestAnimationFrame(loop);
   }
 
