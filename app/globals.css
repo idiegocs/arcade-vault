@@ -1302,6 +1302,10 @@ body:has(.av-player:fullscreen) .av-noise { display: none; }
   background: transparent; border: 0; color: var(--ink-dim); cursor: pointer;
 }
 .auth-tabs button.on { background: rgba(0,245,255,0.08); color: var(--cyan); text-shadow: 0 0 6px rgba(0,245,255,0.5); }
+/* Enlace de texto dentro de la tarjeta de /auth ("¿Olvidaste tu contraseña?"). */
+.auth-forgot { display: block; margin: 12px auto 0; padding: 4px; background: none; border: 0; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.auth-forgot:hover, .auth-forgot:focus-visible { color: var(--cyan); }
+.auth-forgot:focus-visible { outline: 1px solid var(--cyan); outline-offset: 2px; }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .field label { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.16em; }
 .field input {

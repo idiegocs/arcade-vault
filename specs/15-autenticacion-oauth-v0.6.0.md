@@ -211,7 +211,7 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
      - `app/layout.tsx` usa `getSessionUser()` y le pasa `provider` al `Nav`.
      - `components/nav.tsx` muestra el ícono antes del usuario, en desktop y en el menú móvil. El diseño se hace con `/frontend-design`, como pide `CLAUDE.md`.
      - _Prueba:_ entrar con contraseña muestra ✉, con Google muestra ◆ y con GitHub muestra ▣. El `title` dice "Entraste con … · <cuenta>".
-7. **Olvidé mi contraseña.**
+7. ✅ **Olvidé mi contraseña.**
    - Agregar el enlace "¿Olvidaste tu contraseña?" en `/auth`, que abre el formulario de email.
    - Agregar `requestPasswordReset`, que llama a `resetPasswordForEmail` con `redirectTo` a `/auth/callback?next=/auth/restablecer`. Siempre responde `{ notice: "reset-sent" }`, para no revelar si el email existe.
    - Crear `app/auth/restablecer/page.tsx`, que pide contraseña y confirmación y llama a `updatePassword`. Sin sesión, redirige a `/auth`.
@@ -453,7 +453,28 @@ Si alguno de estos llega a hacerse, va en su propio spec.
 - **Prueba** con la cuenta temporal `prueba_spec15`, que se borró al final:
   - Con contraseña, la ficha `email` mide 20×20 y tiene borde de 1 px. Su `title` es "Entraste con correo y contraseña · prueba_spec15@example.com".
   - En el móvil (390 px), la ficha aparece dentro de "Salir (PRUEBA_SPEC15)".
-  - Los casos ◆ Google y ▣ GitHub los tiene que confirmar el usuario con sus cuentas.
+  - ◆ Google y ▣ GitHub: **el usuario los confirmó** con sus cuentas ("si los iconos funcionan").
+
+### Paso 7 — Olvidé mi contraseña (2026-10-24)
+
+- **En `/auth`:** el enlace "¿Olvidaste tu contraseña?" aparece debajo de ENTRAR AL VAULT, solo en la pestaña INICIAR SESIÓN. Es texto mono subrayado (`.auth-forgot`) y se pone cyan con hover o foco.
+  - Al hacer clic, en lugar del formulario aparece `ForgotPassword`, con su propio `useActionState`. Si ya se había escrito un correo, viene precargado.
+  - Cambiar de pestaña o "Volver a iniciar sesión" lo cierra.
+- **`requestPasswordReset`:**
+  - Valida el formato del correo.
+  - Llama a `resetPasswordForEmail` con `redirectTo` a `/auth/callback?next=/auth/restablecer` y **siempre** responde `reset-sent`.
+  - La terminal dice "SI <correo> TIENE UNA CUENTA, TE ENVIAMOS UN ENLACE…".
+- **`/auth/restablecer`:**
+  - Es un Server Component que redirige a `/auth` si no hay sesión. Si hay, muestra `components/reset-password-form.tsx`, con la misma tarjeta, el título "NUEVA CONTRASEÑA" y el correo de la cuenta.
+  - `updatePassword` exige al menos 8 caracteres y que las dos contraseñas coincidan. Después llama a `updateUser({ password })` y redirige a `/`.
+- **Prueba con Playwright**, en un contexto sin cookies y con la cuenta temporal `prueba_spec15`, que se borró al final:
+  1. `/auth/restablecer` sin sesión lleva a `/auth`.
+  2. Email `a@b` → "El correo no tiene un formato válido."
+  3. Email inexistente → la misma terminal de "enlace enviado".
+  4. Con sesión, `/auth/restablecer` muestra `PRUEBA_SPEC15@EXAMPLE.COM`. Una clave corta y dos claves distintas muestran sus errores.
+  5. Con una clave válida se guarda. Después, entrar con la clave vieja → "Usuario o contraseña incorrectos." y con la nueva → `/`.
+- **Pendiente de prueba manual:** el correo real y su enlace. El SMTP por defecto de Supabase solo entrega a miembros del equipo del proyecto y tiene un límite bajo por hora. Hay que probarlo con el correo de `idiegocs`. Para jugadores reales hace falta un SMTP propio (por ejemplo, Resend, que ya usa el formulario de contacto). Queda fuera de este spec.
+- El CSS nuevo tampoco se aplicó esta vez hasta borrar `.next/` y reiniciar. Pasa siempre con `globals.css` en este proyecto.
 
 ### Lecciones aprendidas
 
@@ -461,5 +482,6 @@ Si alguno de estos llega a hacerse, va en su propio spec.
 - En `/auth`, el `click()` de Playwright sobre las pestañas no llega a React, aunque la página esté hidratada. `dispatchEvent('click')` sí funciona. Antes de interactuar hay que esperar a que el botón tenga `__reactProps…`, porque si no el formulario se envía de forma nativa y la página se recarga.
 - Para probar "Salir" en Playwright, no alcanza con esperar la URL `/`: si la página ya estaba en `/`, esa condición se cumple antes de que termine la salida. Hay que esperar a que aparezca el enlace "Iniciar Sesión" (`a.auth-btn`).
 - `auth.identities.last_sign_in_at` no sirve para saber con qué se entró: Supabase solo lo escribe cuando se vincula la identidad. Para la sesión actual hay que mirar el `amr` del JWT, y para distinguir entre proveedores OAuth, el `updated_at` de la identidad.
-- Si un cambio en `app/globals.css` no aparece en el navegador después de reiniciar `npm run dev`, hay que borrar `.next/`. La caché persistente de Turbopack puede seguir sirviendo el CSS viejo.
+- En este proyecto, con `npm run dev` corriendo, los cambios en `app/globals.css` **no** se aplican: ni con HMR ni reiniciando. Hay que parar el servidor, borrar `.next/` y volver a levantarlo. La caché persistente de Turbopack sigue sirviendo el CSS viejo. Pasó en los pasos 6b y 7.
+- En Playwright, esperar `.contact-error` después de un segundo envío puede devolver el error **anterior**, que sigue en pantalla. Para saber si un envío funcionó, hay que mirar el efecto: la URL o un login posterior.
 - Para probar validaciones de email, usar algo como `a@b`. Con `no-es-email`, el `type="email"` del navegador frena el envío y la Server Action nunca se ejecuta.

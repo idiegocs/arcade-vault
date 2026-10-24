@@ -109,6 +109,54 @@ export async function signIn(
   redirect(safeNext(formData.get("next") as string | null));
 }
 
+/**
+ * "¿Olvidaste tu contraseña?". Siempre responde lo mismo, exista o no el
+ * correo, para no revelar qué cuentas hay. El enlace del correo pasa por
+ * /auth/callback (que crea la sesión) y termina en /auth/restablecer.
+ */
+export async function requestPasswordReset(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const email = (formData.get("email") as string | null)?.trim();
+
+  if (!email || !EMAIL_RE.test(email)) {
+    return { error: "El correo no tiene un formato válido." };
+  }
+
+  const supabase = await createClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: await callbackUrl("/auth/restablecer"),
+  });
+
+  return { notice: "reset-sent" };
+}
+
+/** /auth/restablecer: contraseña nueva para la sesión que dejó el enlace del correo. */
+export async function updatePassword(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const password = formData.get("password") as string | null;
+  const confirm = formData.get("confirm") as string | null;
+
+  if (!password || password.length < MIN_PASSWORD) {
+    return { error: `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.` };
+  }
+  if (password !== confirm) {
+    return { error: "Las contraseñas no coinciden." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    return { error: translateAuthError(error.message) };
+  }
+
+  redirect("/");
+}
+
 const PROVIDERS = ["google", "github"] as const;
 type Provider = (typeof PROVIDERS)[number];
 

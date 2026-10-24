@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { signIn, signInWithProvider, signUp } from "@/app/actions/auth";
+import { requestPasswordReset, signIn, signInWithProvider, signUp } from "@/app/actions/auth";
 import { version } from "@/package.json";
 
 /**
@@ -12,6 +12,8 @@ import { version } from "@/package.json";
  */
 export function AuthForm({ next, linkError }: { next: string; linkError: string | null }) {
   const [tab, setTab] = useState<"in" | "up">("in");
+  // "¿Olvidaste tu contraseña?" reemplaza el form de INICIAR SESIÓN hasta volver.
+  const [forgot, setForgot] = useState(false);
   const [signInState, signInAction, signInPending] = useActionState(signIn, undefined);
   const [signUpState, signUpAction, signUpPending] = useActionState(signUp, undefined);
 
@@ -53,15 +55,34 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
         </div>
 
         <div className="auth-tabs">
-          <button type="button" className={tab === "in" ? "on" : ""} onClick={() => setTab("in")}>
+          <button
+            type="button"
+            className={tab === "in" ? "on" : ""}
+            onClick={() => {
+              setTab("in");
+              setForgot(false);
+            }}
+          >
             INICIAR SESIÓN
           </button>
-          <button type="button" className={tab === "up" ? "on" : ""} onClick={() => setTab("up")}>
+          <button
+            type="button"
+            className={tab === "up" ? "on" : ""}
+            onClick={() => {
+              setTab("up");
+              setForgot(false);
+            }}
+          >
             CREAR CUENTA
           </button>
         </div>
 
-        {checkEmail ? (
+        {tab === "in" && forgot ? (
+          <ForgotPassword
+            email={email.includes("@") ? email : ""}
+            onBack={() => setForgot(false)}
+          />
+        ) : checkEmail ? (
           <div className="terminal-success">
             <div className="term-bar">
               <span className="dot r" />
@@ -135,6 +156,17 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
                   : "CREAR Y JUGAR"}
             </button>
 
+            {tab === "in" && (
+              <button
+                type="button"
+                className="auth-forgot"
+                onClick={() => setForgot(true)}
+                disabled={pending}
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            )}
+
             {error && (
               <div className="contact-error" style={{ marginTop: 14 }}>
                 [ERROR] {error}
@@ -195,5 +227,78 @@ function ProviderSubmit({ label }: { label: string }) {
     <button className="btn ghost" type="submit" disabled={pending} style={{ width: "100%" }}>
       {pending ? "CONECTANDO…" : label}
     </button>
+  );
+}
+
+/** Pide el correo y manda el enlace de recuperación. */
+function ForgotPassword({ email: initialEmail, onBack }: { email: string; onBack: () => void }) {
+  const [state, action, pending] = useActionState(requestPasswordReset, undefined);
+  const [email, setEmail] = useState(initialEmail);
+
+  const error = state && "error" in state ? state.error : undefined;
+  const sent = state && "notice" in state && state.notice === "reset-sent";
+
+  if (sent) {
+    return (
+      <div className="terminal-success">
+        <div className="term-bar">
+          <span className="dot r" />
+          <span className="dot y" />
+          <span className="dot g" />
+          <span className="term-title">VAULT-OS // RECUPERAR</span>
+        </div>
+        <div className="term-body">
+          <div className="line">
+            <span className="prompt">vault@arcade:~$</span> ./recuperar --email={email}
+          </div>
+          <div className="line success">
+            &gt; SI {email.toUpperCase()} TIENE UNA CUENTA, TE ENVIAMOS UN ENLACE PARA ELEGIR UNA
+            CONTRASEÑA NUEVA.
+            <span className="caret">_</span>
+          </div>
+          <div style={{ marginTop: 18 }}>
+            <button className="btn ghost" type="button" onClick={onBack}>
+              VOLVER A INICIAR SESIÓN
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form action={action}>
+      <div className="field">
+        <label>Correo de tu cuenta</label>
+        <input
+          name="email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="jugador@vault.gg"
+          disabled={pending}
+        />
+      </div>
+
+      <button
+        className="btn lg"
+        type="submit"
+        style={{ width: "100%", marginTop: 8 }}
+        disabled={pending}
+      >
+        {pending ? "ENVIANDO…" : "ENVIAR ENLACE"}
+      </button>
+
+      <button type="button" className="auth-forgot" onClick={onBack} disabled={pending}>
+        Volver a iniciar sesión
+      </button>
+
+      {error && (
+        <div className="contact-error" style={{ marginTop: 14 }}>
+          [ERROR] {error}
+        </div>
+      )}
+    </form>
   );
 }
