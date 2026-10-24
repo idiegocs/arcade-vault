@@ -343,6 +343,8 @@ Esto lo hace el usuario, fuera del código. `<ref>` es el identificador del proy
 
 ## Lo que **no** entra en este spec
 
+_Agregado tras el code review:_ los enlaces de correo que funcionan en otro dispositivo (`token_hash` + `verifyOtp`), un SMTP propio para que los correos les lleguen a jugadores reales, y el reintento ante la carrera de nombres en el trigger.
+
 - URLs de producción.
 - Pantalla para cambiar el usuario.
 - Otros proveedores OAuth y magic link.
@@ -478,6 +480,25 @@ Si alguno de estos llega a hacerse, va en su propio spec.
   - En el primer intento, el enlace llevó a `/?code=…` (la Site URL) en lugar de `/auth/callback`, y no apareció la pantalla de contraseña. Las causas probables: el enlace se pidió desde otro origen (`192.168.68.60`, la IP del dev server en la red local), que no está en Redirect URLs, así que Supabase lo descartó y usó la Site URL; y además se abrió en otro dispositivo, sin la cookie del code verifier de PKCE.
   - **En el segundo intento funcionó:** pedido y clic en el mismo navegador, por `localhost:3000`, y llegó a NUEVA CONTRASEÑA.
 - El CSS nuevo tampoco se aplicó esta vez hasta borrar `.next/` y reiniciar. Pasa siempre con `globals.css` en este proyecto.
+
+### Correcciones del code review (2026-10-24)
+
+A pedido del usuario, se corrió `/code-review high` sobre toda la rama contra `master` y encontró 9 problemas. Se corrigieron del 1 al 7, cada grupo en su commit. El 8 y el 9 quedan documentados como limitaciones.
+
+| #   | Problema                                                                                                                                                        | Corrección                                                                                                                                                                                                                                    | Commit    |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 1   | **Redirección abierta:** `safeNext` solo miraba el prefijo. `/%09/evil.com` (tab) y `/%0A/evil.com` pasaban, y el parser de URLs los convertía en `//evil.com`. | `safeNext` resuelve `next` contra un origen ficticio, exige que el origen no cambie y devuelve `pathname + search + hash` normalizados. Se probaron 13 casos en `tsx` (tab, LF, CRLF, `\`, `\\`, `//`, `javascript:`): ninguno sale del host. | `fd5fa81` |
+| 2   | **`/auth/restablecer` aceptaba cualquier sesión:** con una sesión abierta se podía cambiar la contraseña sin saber la actual.                                   | `isRecoverySession()` en `lib/session.ts` lee el `amr` con `getClaims()`. La página y `updatePassword` exigen `recovery`, que es el valor confirmado en la sesión real del enlace del usuario. Una sesión con contraseña ahora es redirigida. | `fd5fa81` |
+| 3   | El login por usuario se rompía si faltaba `SUPABASE_SECRET_KEY` y ocultaba los errores de la RPC como "contraseña incorrecta".                                  | `try/catch` en el lookup: `console.error` y el mensaje `AUTH_UNAVAILABLE`.                                                                                                                                                                    | `d550b5f` |
+| 4   | Cancelar en Google o GitHub mostraba "El enlace expiró".                                                                                                        | Si el callback recibe `?error=…`, redirige a `/auth?error=proveedor` → "Proveedor no disponible".                                                                                                                                             | `d550b5f` |
+| 5   | Un solo estado `email` para "Usuario o correo" y para el correo de CREAR CUENTA. Además, "REVISA TU CORREO" no se iba al cambiar de pestaña.                    | Estados `identifier` y `email` separados, y `dismissedNotice`, que se fija al cambiar de pestaña.                                                                                                                                             | `d550b5f` |
+| 6   | `getSessionUser` hacía `getUser` → perfil → `getClaims` en serie, en cada render. `getSessionUsername` calculaba el método de ingreso sin usarlo.               | El perfil y el método de ingreso corren en paralelo (`Promise.all`). `getSessionUsername` solo consulta el perfil.                                                                                                                            | `5fefd33` |
+| 7   | El `UNIQUE` de `profiles.username` distingue mayúsculas, así que `PX_Kai` y `px_kai` podían convivir. Hoy no hay perfiles con mayúsculas.                       | `sql/006_username_unico_sin_mayusculas.sql`: índice único sobre `lower(username)`. Una prueba revertida confirmó `unique_violation` al poner `PRUEBA_SPEC15` con `prueba_spec15` ya existente.                                                | `471594f` |
+
+**Limitaciones que quedan documentadas, sin corregir en este spec:**
+
+- **(8) Los enlaces de correo solo funcionan en el navegador que los pidió.** Confirmación y recuperación usan PKCE (`exchangeCodeForSession`), y el code verifier vive en una cookie de ese navegador. Si se pide en el PC y se abre en el celular, aparece "El enlace expiró". Al usuario le pasó en el paso 7. La solución es pasar las plantillas de correo de Supabase a `{{ .TokenHash }}` con `verifyOtp({ type, token_hash })` en el servidor. Va en un spec propio, porque cambia la configuración de Supabase y el flujo.
+- **(9) Carrera entre dos registros simultáneos con el mismo nombre base:** el trigger revisa `EXISTS` y después inserta, sin bloquear. El segundo choca con el `UNIQUE`, `auth.users` se revierte y el jugador ve "No pudimos crear tu perfil" y vuelve a intentar. Con el tráfico actual es muy improbable. Si hace falta, se arregla con un bucle `INSERT … ON CONFLICT DO NOTHING` y reintento.
 
 ### Lecciones aprendidas
 
