@@ -21,15 +21,25 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   if (!user) return null;
 
+  // El perfil y el método de ingreso no dependen entre sí: en paralelo.
+  const [username, login] = await Promise.all([
+    profileUsername(supabase, user.id),
+    sessionLogin(supabase, user),
+  ]);
+
+  return username ? { username, login } : null;
+}
+
+async function profileUsername(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<string | null> {
   const { data: profile } = await supabase
     .from("profiles")
     .select("username")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
-
-  if (!profile) return null;
-
-  return { username: profile.username, login: await sessionLogin(supabase, user) };
+  return profile?.username ?? null;
 }
 
 /**
@@ -78,5 +88,10 @@ export async function isRecoverySession(): Promise<boolean> {
 
 /** Username del usuario con sesión activa, o null si no hay sesión. */
 export async function getSessionUsername(): Promise<string | null> {
-  return (await getSessionUser())?.username ?? null;
+  // Sin el método de ingreso: quien lo usa (la página de juego) no lo necesita.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ? profileUsername(supabase, user.id) : null;
 }
