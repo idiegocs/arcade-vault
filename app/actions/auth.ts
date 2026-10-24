@@ -92,7 +92,7 @@ export async function signIn(
     return { error: translateAuthError(error.message) };
   }
 
-  redirect("/");
+  redirect(safeNext(formData.get("next") as string | null));
 }
 
 export async function signOut() {

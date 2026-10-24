@@ -5,6 +5,8 @@
 
 export const INVALID_CREDENTIALS = "Usuario o contraseña incorrectos.";
 
+export const LINK_EXPIRED = "El enlace expiró. Pide uno nuevo.";
+
 const GENERIC_ERROR = "Algo salió mal. Intenta de nuevo en unos segundos.";
 
 // Fragmentos (en minúsculas) de los mensajes de Supabase → texto en español.
@@ -24,7 +26,7 @@ const TRANSLATIONS: [string, string][] = [
   ["rate limit", "Demasiados intentos. Espera un momento y vuelve a probar."],
   ["you can only request this after", "Demasiados intentos. Espera un momento y vuelve a probar."],
   ["auth session missing", "Tu sesión expiró. Vuelve a iniciar sesión."],
-  ["expired", "El enlace expiró. Pide uno nuevo."],
+  ["expired", LINK_EXPIRED],
   ["database error saving new user", "No pudimos crear tu perfil. Intenta de nuevo."],
 ];
 

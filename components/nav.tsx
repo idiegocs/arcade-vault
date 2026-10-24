@@ -37,6 +37,12 @@ export function Nav({ username }: { username: string | null }) {
 
   const close = () => setOpen(false);
 
+  // Tras entrar, /auth vuelve a la página desde la que se hizo clic.
+  const authHref =
+    pathname === "/" || pathname.startsWith("/auth")
+      ? "/auth"
+      : `/auth?next=${encodeURIComponent(pathname)}`;
+
   return (
     <>
       <nav className="av-nav">
@@ -82,7 +88,7 @@ export function Nav({ username }: { username: string | null }) {
             </button>
           </form>
         ) : (
-          <Link href="/auth" className="btn auth-btn">
+          <Link href={authHref} className="btn auth-btn">
             Iniciar Sesión
           </Link>
         )}
@@ -124,7 +130,7 @@ export function Nav({ username }: { username: string | null }) {
             </button>
           </form>
         ) : (
-          <Link href="/auth" className={isActive("auth") ? "active" : ""} onClick={close}>
+          <Link href={authHref} className={isActive("auth") ? "active" : ""} onClick={close}>
             Iniciar Sesión
           </Link>
         )}

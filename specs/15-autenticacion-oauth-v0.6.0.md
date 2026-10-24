@@ -188,7 +188,7 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
    - Crear `app/auth/callback/route.ts` con `exchangeCodeForSession` y redirect a `safeNext(next)`.
    - Pasar `emailRedirectTo` a `signUp`. Si no devuelve sesión, `signUp` responde `{ notice: "check-email" }` y la tarjeta muestra "REVISA TU CORREO".
    - _Prueba:_ registrarse funciona con "Confirm email" activado y desactivado. Un `code` inválido en `/auth/callback` lleva a `/auth` con un error.
-4. **Separar `/auth` y agregar redirecciones.**
+4. ✅ **Separar `/auth` y agregar redirecciones.**
    - `app/auth/page.tsx` pasa a ser Server Component: si hay sesión, redirige a `/`, y le pasa `next` al formulario.
    - El formulario se muda a `components/auth-form.tsx`, sin cambios visuales.
    - JUGAR COMO INVITADO lleva a `/games`, y `v2.6` se reemplaza por la `version` de `@/package.json`.
@@ -369,6 +369,25 @@ Si alguno de estos llega a hacerse, va en su propio spec.
   - Registro real desde la UI, en un contexto de navegador sin cookies: `Prueba_Spec15` → redirige a `/`, el Nav muestra `PRUEBA_SPEC15` y `profiles` tiene `prueba_spec15`. Después la cuenta se borró.
 - **Bug del paso 1, encontrado acá:** el trigger recortaba a 12 caracteres **cualquier** username, también los de registro con contraseña. Por eso `prueba_spec15` quedaba como `prueba_spec1`. Con la migración `handle_new_user_username_completo`, un username válido (`^[a-z0-9_]{3,16}$`) y libre se guarda tal cual, y solo los generados se recortan. Se actualizó `sql/005_…` para reflejar la función final.
   - Prueba revertida: `prueba_spec15` y `dieciseis_chars_` completos; `pxkai`/`pxkai1`, `octocat`, `jugador` y `unnombremuyl` igual que antes. Un username repetido (carrera entre dos registros) cae en el generado.
+
+### Paso 4 — `/auth` en el servidor y redirecciones (2026-10-24)
+
+- `git mv app/auth/page.tsx components/auth-form.tsx`, para conservar el historial. El formulario exporta `AuthForm({ next, linkError })` y manda `next` en un `<input type="hidden">`.
+- `app/auth/page.tsx` es ahora un Server Component: con sesión hace `redirect("/")`. Si no, lee `searchParams` (que es una `Promise` en Next 16), valida `next` con `safeNext` y convierte `?error=enlace` en `LINK_EXPIRED`, una constante nueva en `lib/auth-errors.ts` que comparte con la traducción de `expired`.
+- El error del callback se muestra solo hasta el primer intento en el formulario. Después mandan los errores de la Server Action.
+- `signIn` y `signUp` redirigen a `safeNext(next)`.
+- `components/nav.tsx` arma `authHref`: es `/auth?next=<pathname>`, salvo en `/` y en `/auth…`, donde el `next` no aporta nada.
+- JUGAR COMO INVITADO pasó de `<button>` a `<Link href="/games" className="btn ghost">`. `.btn` ya es `inline-flex` centrado, así que se ve igual.
+- La tarjeta muestra `v{version}` desde `@/package.json`. Hoy dice `v0.5.2` y va a pasar a `v0.6.0` con el bump del paso 8.
+- **Prueba con Playwright** (casos 2 a 8 en un contexto sin cookies, con una cuenta temporal `prueba_spec15` que se borró al final):
+  1. Con sesión (`IDIEGOCS`), `/auth` → `/`.
+  2. La versión se muestra `v0.5.2`.
+  3. `?error=enlace` → "El enlace expiró. Pide uno nuevo."
+  4. `next=https://evil.com`, `//evil.com` y `/\evil.com` → el `next` oculto queda en `/`.
+  5. INVITADO → `/games`.
+  6. En `/juegos/caida`, el Nav apunta a `/auth?next=%2Fjuegos%2Fcaida`.
+  7. Registro desde ahí → `/juegos/caida`.
+  8. Salir y volver a entrar con contraseña → `/juegos/caida`.
 
 ### Lecciones aprendidas
 
