@@ -1,10 +1,18 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { translateAuthError } from "@/lib/auth-errors";
+import { safeNext, translateAuthError } from "@/lib/auth-errors";
 
-export type AuthFormState = { error: string } | undefined;
+export type AuthFormState =
+  { error: string } | { notice: "check-email" | "reset-sent" } | undefined;
+
+/** URL de /auth/callback para los enlaces que manda Supabase, con el destino final en `next`. */
+async function callbackUrl(next: string): Promise<string> {
+  const origin = (await headers()).get("origin") ?? "http://localhost:3000";
+  return `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+}
 
 const USERNAME_RE = /^[a-z0-9_]{3,16}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -43,17 +51,24 @@ export async function signUp(
     return { error: "Ese usuario ya está en uso." };
   }
 
-  const { error } = await supabase.auth.signUp({
+  const next = safeNext(formData.get("next") as string | null);
+
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username } },
+    options: { data: { username }, emailRedirectTo: await callbackUrl(next) },
   });
 
   if (error) {
     return { error: translateAuthError(error.message) };
   }
 
-  redirect("/");
+  // Sin sesión = el proyecto tiene "Confirm email" activado: falta el enlace del correo.
+  if (!data.session) {
+    return { notice: "check-email" };
+  }
+
+  redirect(next);
 }
 
 export async function signIn(

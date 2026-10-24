@@ -19,7 +19,9 @@ export default function AuthPage() {
   const state = tab === "in" ? signInState : signUpState;
   const pending = tab === "in" ? signInPending : signUpPending;
   const action = tab === "in" ? signInAction : signUpAction;
-  const shake = Boolean(state?.error) && !pending;
+  const error = state && "error" in state ? state.error : undefined;
+  const checkEmail = tab === "up" && state && "notice" in state && state.notice === "check-email";
+  const shake = Boolean(error) && !pending;
 
   return (
     <div className="av-auth-wrap fade-in">
@@ -49,63 +51,85 @@ export default function AuthPage() {
           </button>
         </div>
 
-        <form action={action}>
-          {tab === "up" && (
-            <div className="field slide-in">
-              <label>Usuario</label>
+        {checkEmail ? (
+          <div className="terminal-success">
+            <div className="term-bar">
+              <span className="dot r" />
+              <span className="dot y" />
+              <span className="dot g" />
+              <span className="term-title">VAULT-OS // REGISTRO</span>
+            </div>
+            <div className="term-body">
+              <div className="line">
+                <span className="prompt">vault@arcade:~$</span> ./crear_cuenta --user={username}
+              </div>
+              <div className="line dim">[OK] Cuenta creada.</div>
+              <div className="line success">
+                &gt; REVISA TU CORREO. TE ENVIAMOS UN ENLACE A {email.toUpperCase()} PARA ACTIVAR TU
+                CUENTA.
+                <span className="caret">_</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <form action={action}>
+            {tab === "up" && (
+              <div className="field slide-in">
+                <label>Usuario</label>
+                <input
+                  name="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="px_kai"
+                  disabled={pending}
+                />
+              </div>
+            )}
+            <div className="field">
+              <label>Correo electrónico</label>
               <input
-                name="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="px_kai"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="jugador@vault.gg"
                 disabled={pending}
               />
             </div>
-          )}
-          <div className="field">
-            <label>Correo electrónico</label>
-            <input
-              name="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="jugador@vault.gg"
-              disabled={pending}
-            />
-          </div>
-          <div className="field">
-            <label>Contraseña</label>
-            <input
-              name="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              disabled={pending}
-            />
-          </div>
-
-          <button
-            className="btn lg"
-            type="submit"
-            style={{ width: "100%", marginTop: 8 }}
-            disabled={pending}
-          >
-            {pending
-              ? tab === "in"
-                ? "ENTRANDO…"
-                : "CREANDO…"
-              : tab === "in"
-                ? "ENTRAR AL VAULT"
-                : "CREAR Y JUGAR"}
-          </button>
-
-          {state?.error && (
-            <div className="contact-error" style={{ marginTop: 14 }}>
-              [ERROR] {state.error}
+            <div className="field">
+              <label>Contraseña</label>
+              <input
+                name="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                disabled={pending}
+              />
             </div>
-          )}
-        </form>
+
+            <button
+              className="btn lg"
+              type="submit"
+              style={{ width: "100%", marginTop: 8 }}
+              disabled={pending}
+            >
+              {pending
+                ? tab === "in"
+                  ? "ENTRANDO…"
+                  : "CREANDO…"
+                : tab === "in"
+                  ? "ENTRAR AL VAULT"
+                  : "CREAR Y JUGAR"}
+            </button>
+
+            {error && (
+              <div className="contact-error" style={{ marginTop: 14 }}>
+                [ERROR] {error}
+              </div>
+            )}
+          </form>
+        )}
 
         <button className="btn ghost" type="button" style={{ width: "100%", marginTop: 10 }}>
           JUGAR COMO INVITADO

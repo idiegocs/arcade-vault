@@ -63,6 +63,14 @@ DECLARE
   candidate text;
   n int := 0;
 BEGIN
+  -- Registro con email/contraseña: username válido y libre → tal cual, sin recortar
+  candidate := lower(new.raw_user_meta_data->>'username');
+  IF candidate ~ '^[a-z0-9_]{3,16}$'
+     AND NOT EXISTS (SELECT 1 FROM profiles WHERE username = candidate) THEN
+    INSERT INTO profiles (id, username) VALUES (new.id, candidate);
+    RETURN new;
+  END IF;
+  -- OAuth (o username inválido/tomado): se genera
   base := coalesce(
     new.raw_user_meta_data->>'username',    -- registro con email/contraseña
     new.raw_user_meta_data->>'user_name',   -- GitHub
@@ -159,7 +167,7 @@ flowchart LR
 Convenciones:
 
 - El usuario siempre se guarda en minúsculas.
-- La base generada se corta a 12 caracteres para dejar lugar al sufijo y no pasar de 16.
+- Solo el usuario **generado** se corta a 12 caracteres, para dejar lugar al sufijo y no pasar de 16. El que elige el jugador al registrarse con contraseña se guarda completo (3–16).
 - Las cuentas de email/contraseña ya validan el `username` en la Server Action antes de llegar al trigger. El trigger solo lo limpia por si acaso.
 - La tarjeta muestra la versión importando `version` desde `@/package.json`, igual que ya hace `components/nav.tsx`.
 
@@ -175,7 +183,7 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
    - Usar `translateAuthError` en `signIn` y `signUp`.
    - En `signUp`, validar usuario `^[a-z0-9_]{3,16}$`, contraseña de al menos 8 caracteres y formato de email. Verificar que el usuario no exista consultando `profiles`.
    - _Prueba:_ contraseña corta, usuario con mayúsculas o espacios, y usuario repetido muestran errores en español. Un login fallido muestra "Usuario o contraseña incorrectos".
-3. **Callback y confirmación de email.**
+3. ✅ **Callback y confirmación de email.**
    - _Pausa:_ el usuario registra la Redirect URL en Supabase (Anexo, B).
    - Crear `app/auth/callback/route.ts` con `exchangeCodeForSession` y redirect a `safeNext(next)`.
    - Pasar `emailRedirectTo` a `signUp`. Si no devuelve sesión, `signUp` responde `{ notice: "check-email" }` y la tarjeta muestra "REVISA TU CORREO".
@@ -349,6 +357,18 @@ Si alguno de estos llega a hacerse, va en su propio spec.
 - `signIn` no necesita lógica extra para el error genérico: Supabase ya responde `Invalid login credentials` tanto si el correo no existe como si la contraseña está mal.
 - **Prueba con Playwright en `/auth`:** contraseña `abc`, usuario `Mal Usuario`, email `a@b`, usuario `IDIEGOCS` (ya tomado) y login con un correo inexistente. Los 5 casos muestran su mensaje en español.
 - No se probó un registro válido completo, para no crear una cuenta real en el proyecto.
+
+### Paso 3 — Callback y confirmación de email (2026-10-24)
+
+- `app/auth/callback/route.ts`: con un `code` válido redirige a `safeNext(next)`. Sin `code`, o con uno inválido, expirado o ya usado, redirige a `/auth?error=enlace`.
+- `signUp` arma `emailRedirectTo` con el header `origin` de la request. Si no lo tiene, usa `http://localhost:3000`. Si `data.session` es `null`, responde `{ notice: "check-email" }`, y la tarjeta muestra una terminal con el estilo de `/about` (`.terminal-success`).
+- **El mensaje de `?error=enlace` se muestra en el paso 4.** Mostrarlo ahora obligaba a usar `useSearchParams` con `Suspense` en la página cliente. El paso 4 la convierte en Server Component, que lee `searchParams` directamente.
+- **Configuración real del proyecto** (leída de `GET /auth/v1/settings` con la clave pública): Google ✅, GitHub ✅, email ✅, `mailer_autoconfirm: true`. Es decir, "Confirm email" está **desactivado**: el registro inicia la sesión enseguida y la terminal "REVISA TU CORREO" no aparece. Ese camino queda escrito pero sin probar de punta a punta.
+- **Pruebas:**
+  - `curl` a `/auth/callback` con `code` inválido, sin `code`, y con `next=//evil.com`: las tres responden 307 → `/auth?error=enlace`.
+  - Registro real desde la UI, en un contexto de navegador sin cookies: `Prueba_Spec15` → redirige a `/`, el Nav muestra `PRUEBA_SPEC15` y `profiles` tiene `prueba_spec15`. Después la cuenta se borró.
+- **Bug del paso 1, encontrado acá:** el trigger recortaba a 12 caracteres **cualquier** username, también los de registro con contraseña. Por eso `prueba_spec15` quedaba como `prueba_spec1`. Con la migración `handle_new_user_username_completo`, un username válido (`^[a-z0-9_]{3,16}$`) y libre se guarda tal cual, y solo los generados se recortan. Se actualizó `sql/005_…` para reflejar la función final.
+  - Prueba revertida: `prueba_spec15` y `dieciseis_chars_` completos; `pxkai`/`pxkai1`, `octocat`, `jugador` y `unnombremuyl` igual que antes. Un username repetido (carrera entre dos registros) cae en el generado.
 
 ### Lecciones aprendidas
 

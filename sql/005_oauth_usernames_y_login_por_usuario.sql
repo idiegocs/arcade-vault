@@ -13,6 +13,17 @@ DECLARE
   candidate text;
   n int := 0;
 BEGIN
+  -- Registro con email/contraseña: el username ya viene validado por signUp
+  -- (3–16 caracteres) y se guarda tal cual, sin recortar.
+  candidate := lower(new.raw_user_meta_data->>'username');
+  IF candidate ~ '^[a-z0-9_]{3,16}$'
+     AND NOT EXISTS (SELECT 1 FROM profiles WHERE username = candidate) THEN
+    INSERT INTO profiles (id, username) VALUES (new.id, candidate);
+    RETURN new;
+  END IF;
+
+  -- OAuth (o username inválido/tomado): se genera uno a partir de los datos
+  -- del proveedor, recortado a 12 para dejar lugar al sufijo numérico.
   base := coalesce(
     new.raw_user_meta_data->>'username',    -- registro con email/contraseña
     new.raw_user_meta_data->>'user_name',   -- GitHub
