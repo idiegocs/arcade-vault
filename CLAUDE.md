@@ -4,57 +4,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+> **Keep this file short (< ~8 KB).** It's an index, not a manual: one line per item plus a link. Details belong in the linked spec, skill, agent or reference file — never duplicate them here (no game lists, version numbers or "latest spec" counters).
+
 ## Project
 
-Arcade Vault — a platform for playing games online and competing on points/leaderboards (per README, in Spanish). Built out via specs 01–10: real Supabase-backed auth, scores, and game catalog, plus a growing set of real playable game engines behind a pluggable engine contract (`components/games/game-engine.ts`, registered in `components/games/registry.ts`) that the rest of the catalog plugs into gradually, one spec at a time. See `components/games/README.md` for how a new game is wired in. Any catalog entry without a registered engine falls back to a static, non-interactive mock HUD (`app/juegos/[id]/jugar/page.tsx`) left over from spec 01.
+Arcade Vault — a platform for playing games online and competing on points/leaderboards (per README, in Spanish). The app version lives in `package.json` (single source of truth; history in `CHANGELOG.md`). Supabase-backed auth, scores and game catalog, plus real game engines behind a pluggable contract (`components/games/game-engine.ts`, registered in `components/games/registry.ts`; how to wire one in: `components/games/README.md`). Catalog entries without an engine fall back to the static mock HUD in `app/juegos/[id]/jugar/page.tsx`.
 
-**`references/juegos-implementados.md` tracks which catalog games have a real engine.** Update it every time a game is added to or removed from `components/games/registry.ts` (or from the `games` table) — it's the source of truth for "which games exist and which have a real motor," kept separate from this file so this file doesn't go stale as the catalog grows.
+Key rules:
 
-`app/actions/scores.ts` (`saveScore`) rejects any score above the game's `maxPlausibleScore` before persisting (added by OpenSpec change `11-score-plausibility-caps-v0.2.5`). That cap lives in the game's own entry in `components/games/registry.ts`, next to its engine loader — a game with no registry entry gets every score rejected (fail-closed for unconfigured games is intentional). Game sounds likewise live in each engine (`defineSounds` from `components/games/audio.ts`, which only holds the shared infrastructure), so adding a game touches neither `audio.ts` nor `scores.ts`.
+- **[`references/juegos-implementados.md`](references/juegos-implementados.md)** is the source of truth for which games have a real engine. Update it whenever a game is added to/removed from `registry.ts` or the `games` table.
+- **Score caps:** `saveScore` (`app/actions/scores.ts`) rejects scores above the game's `maxPlausibleScore` from its `registry.ts` entry; no entry ⇒ every score rejected (fail-closed, intentional — spec 11).
+- **Per-game, not platform:** sounds (`defineSounds` from `components/games/audio.ts`), background music (spec 13), skins `clasico`/`neon`/`retro` (CAÍDA is the reference) and `touchControls` (spec 12) all live in each game's engine/registry entry. Adding a game never touches `audio.ts` or `scores.ts`.
+- **Performance:** new engines follow the "Rendimiento" rules in `components/games/README.md` (spec 14: freeze after game over, cached background/glow, allocation-free `draw`). Dev-only FPS counter in the player; `@game-performance-booster` logs its runs in `references/rendimiento-juegos.md` (created on its first run).
 
 ## Knowledge graph (Graphify)
 
-`graphify-out/` holds a Graphify knowledge graph of the whole repo (code via AST + specs/docs via semantic extraction): `GRAPH_REPORT.md` (god nodes, communities, surprising connections), `graph.json` (full graph), `graph.html` (interactive view). **Use it before reading files one by one** when you need to understand the code — architecture, what calls what, how a spec maps to its implementation, or what a change would affect:
+`graphify-out/` (gitignored) holds a knowledge graph of the repo — start from `graphify-out/GRAPH_REPORT.md`, then `graphify query|path|explain|affected "<X>"` (or `/graphify`) **before reading files one by one**. Missing? Run `graphify extract . --code-only`, then `graphify cluster-only . --no-label` (code only, no LLM; needs `pipx install "graphifyy[sql]"`), or `/graphify .` for the full graph including specs/docs (uses LLM tokens). Stale: `graphify update .` after code changes, `/graphify .` after spec/doc changes. Always confirm against the source before editing.
 
-- `graphify-out/` is gitignored (generated, machine-specific), so a fresh clone won't have it. If it's missing, build it: `graphify extract . --code-only` then `graphify cluster-only . --no-label` (code only, local, no LLM), or `/graphify .` for the full graph including specs/docs (uses LLM tokens). Needs the `graphify` CLI (`pipx install "graphifyy[sql]"`).
-- Start from `graphify-out/GRAPH_REPORT.md` for the big picture.
-- Query instead of grepping around: `graphify query "<question>"`, `graphify path "A" "B"`, `graphify explain "X"`, `graphify affected "X"` (or the `/graphify` skill, which answers from the existing graph).
-- The graph can be stale — its report records the commit it was built from. After code changes, refresh with `graphify update .` (code only, no LLM); re-run `/graphify .` when specs/docs change. Always confirm against the actual source before editing.
+## Skills & agents
 
-## Skills
+Usa siempre el /frontend-design para hacer interfaz de usuario.
 
-Usa siempre el /fontend-design para hacer interfaz de usuario.
+Use these instead of ad-hoc game work. Each file holds the full instructions.
 
-This repo also ships two project-scoped skills under `.claude/skills/`: `add-game` (designs a spec for a new/ported game — motor, registry, Supabase row if needed, cover CSS if needed) and `add-game-impl` (implements an approved one). Use them instead of ad-hoc game additions.
+- [`/add-game`](.claude/skills/add-game/) — designs a spec for a new/ported game (engine, registry, Supabase row, cover CSS).
+- [`/add-game-impl`](.claude/skills/add-game-impl/) — implements an approved `/add-game` spec.
+- [`/spec-impl-game <NN>`](.claude/skills/spec-impl-game/) — end-to-end impl of an approved game spec (reuses user-level `/spec-impl`), then runs `@skin-designer` → `@mobile-porter` **sequentially, never in parallel**.
+- [`/game-jam <tema>`](.claude/skills/game-jam/) — picks 3 games for a theme and launches one `@game-jam` per game in parallel → `specs/game-jam/<NN>-<game-id>/spec.md` (Borrador). To implement: promote to `specs/NN-<slug>-vX.Y.Z.md`, mark `Aprobado`, run `/add-game-impl NN`.
+- [`@game-planner`](.claude/agents/game-planner.md) — decides whether a candidate game fits or proposes the next one (upstream of `/add-game`); log in [`references/candidatos-juegos.md`](references/candidatos-juegos.md). No code.
+- [`@game-jam`](.claude/agents/game-jam.md) — writes one jam spec. Launched only by `/game-jam`.
+- [`@skin-designer <id>`](.claude/agents/skin-designer.md) — ensures `clasico`/`neon`/`retro` skins exist. Visual only.
+- [`@mobile-porter <id>`](.claude/agents/mobile-porter.md) — makes a game playable on phones per spec 12 (input audit, `touchControls`, Playwright touch check).
+- [`@game-performance-booster <id|nombre>`](.claude/agents/game-performance-booster.md) — measures and fixes an engine's performance per spec 14; reports before→after. **Uses git** (`git stash`, `git checkout -- <motor>` to revert a failed fix) — commit engine work before running it.
 
-**`.claude/agents/game-planner.md`** (`@game-planner`) decides whether a candidate game fits the platform (engine contract, bounded vs. sanity-ceiling scoring, catalog priority) or proposes the next one — a step upstream of `/add-game`, which assumes the game choice is already made. It never writes specs or code. See `references/candidatos-juegos.md` for its memory log of past evaluations, which it reads before every run and appends to after.
-
-**`/game-jam <tema>`** (`.claude/skills/game-jam/`) runs a themed game jam: it picks 3 mechanically distinct games for the theme, then launches one **`@game-jam`** agent (`.claude/agents/game-jam.md`) per game **in parallel**, each writing a full `/add-game`-style spec (modeled on the existing game specs in `specs/`) to `specs/game-jam/<NN>-<game-id>/spec.md` — `NN` is a sequential number across all jams (next free one), the spec itself stays `Borrador` and unnumbered in the `specs/` sequence. Neither writes code; invoke the skill, not the agent directly. To implement one, promote it by hand to `specs/NN-<slug>-vX.Y.Z.md`, mark it `Aprobado`, then run `/add-game-impl NN`.
-
-**`.claude/agents/skin-designer.md`** (`@skin-designer <game-id>`) checks that a game's engine has at least the `clasico` (default), `neon` and `retro` skins and implements any missing ones, using CAÍDA (Tetris) as the reference pattern. Skins are visual only — never gameplay, sounds or scoring. On its first run it also creates the skin infrastructure (`REQUIRED_SKINS`/`SkinId` in `game-engine.ts`, `components/games/skins.ts`, `skins` in `registry.ts`, and the selector in `game-player-shell.tsx`), applying it to `caida` first. It doesn't bump versions or touch git.
-
-**`.claude/agents/mobile-porter.md`** (`@mobile-porter <game-id>`) makes a game (typically a newly added one) playable and well laid out on a phone, using spec 12 (`specs/12-controles-tactiles-movil-v0.4.0.md`) as the contract: audits the engine's input (`window` listeners, `e.code`, no `isTrusted` filter, every in-game key reachable, `repeat` vs polling), adds/fixes the game's `touchControls` in `registry.ts`, and verifies with Playwright (touch emulation) at the spec's portrait/landscape viewports plus desktop. Per run it only touches the game's registry entry and its engine's input handling; platform files only for a minimal fix. Never gameplay, scoring, skins or sounds; doesn't bump versions or touch git.
-
-**`/spec-impl-game <NN>`** (`.claude/skills/spec-impl-game/`) implements an approved game spec end to end: it reuses the user-level `/spec-impl` by reading its `SKILL.md` at runtime (Approved gate, branch, step-by-step with pauses), layers on `add-game-impl`'s engine rules and end-to-end verification, and when implementation is done launches **`@skin-designer`** and then **`@mobile-porter`** on the new `game-id` — strictly one after the other, never in parallel, since both edit `registry.ts` and the engine.
-
-`.claude/` is gitignored as of 2026-09-20 (OpenSpec's own generated skills/commands live there and don't need to be committed) — but `add-game`, `add-game-impl`, `spec-impl-game`, `game-jam`, `hooks/format-on-write.ps1`, `agents/game-planner.md`, `agents/game-jam.md`, `agents/skin-designer.md`, and `agents/mobile-porter.md` were force-added (`git add -f`) and stay tracked; gitignore doesn't untrack existing files.
+None of the agents bump versions or commit. `.claude/` is gitignored (since 2026-09-20), but the items above and `hooks/format-on-write.ps1` are force-added (`git add -f`) and tracked — force-add any new one too.
 
 ## Stack
 
 - Next.js 16.2.10, App Router only (`app/`), React 19.2.4
-- Tailwind CSS v4 via `@tailwindcss/postcss` — there is no `tailwind.config.*`; theme tokens are declared with `@theme inline` directly in `app/globals.css`
-- TypeScript with path alias `@/*` → repo root (`tsconfig.json`)
-- Fonts loaded via `next/font/google` (Geist, Geist Mono), exposed as CSS variables and applied in `app/layout.tsx`
+- Tailwind CSS v4 via `@tailwindcss/postcss` — no `tailwind.config.*`; theme tokens via `@theme inline` in `app/globals.css`
+- TypeScript, path alias `@/*` → repo root
+- Fonts via `next/font/google` (Geist, Geist Mono) as CSS variables in `app/layout.tsx`
 
 ## Working with this Next.js version
 
-Next.js 16.2.10 postdates this model's training data and has breaking changes vs. the Next.js you know from training — APIs, conventions, and file structure may differ. Before writing or editing any Next.js code (routing, data fetching, config, middleware, server/client component rules, etc.), read the relevant guide under `node_modules/next/dist/docs/` (App Router docs live under `01-app/`) instead of relying on prior knowledge, and heed any deprecation notices found there.
+Next.js 16.2.10 postdates this model's training data and has breaking changes. Before writing or editing any Next.js code, read the relevant guide under `node_modules/next/dist/docs/` (App Router: `01-app/`) and heed deprecation notices.
 
 ## Spec-driven workflow
 
-This repo runs **two** spec-driven systems side by side:
+Two systems share **one number/version sequence** — a new spec or change takes the next free `NN` across both `specs/` and `openspec/` (e.g. 11 exists only in `openspec/`) — and both bump `package.json` + `CHANGELOG.md`:
 
-- **`specs/` (Klerith)** — the original one. The README documents `/spec` and `/spec-impl`, based on the `Klerith/fernando-skills` skill pack (`npx skills@latest add Klerith/fernando-skills`). Those two are user-level skills (`~/.claude/skills/`), not installed in this repo's own `.claude/`. Numbered files: `specs/NN-slug-vX.Y.Z.md` (01 through 10 so far), one per shipped version, indexed in `CHANGELOG.md`.
-- **`openspec/` (OpenSpec)** — added 2026-09-20 (`openspec init`), used via `/opsx:propose` → `/opsx:apply` → `/opsx:archive`. **Convention for this repo:** an OpenSpec change keeps numbering/dating/versioning itself the same way as `specs/`, continuing the same number sequence — e.g. change `11-score-plausibility-caps-v0.2.5` (specs/ left off at `10-...-v0.2.4`). Its main capability spec under `openspec/specs/<name>/spec.md` also gets named after the originating change (not a generic domain name like `score-integrity`) so the capability and the change/version that introduced it are traceable at a glance. Archived changes land in `openspec/changes/archive/YYYY-MM-DD-<name>/`. Both systems' version bumps go through the same `package.json` + `CHANGELOG.md` convention (see `CHANGELOG.md`'s header).
-
-Only the game-specific `add-game`/`add-game-impl` pair, the `game-planner`, `game-jam`, `skin-designer` and `mobile-porter` agents (above), and OpenSpec's own generated skills are project-scoped under `.claude/`.
+- **[`specs/`](specs/) (Klerith)** — `/spec` and `/spec-impl`, user-level skills from `Klerith/fernando-skills` (`npx skills@latest add Klerith/fernando-skills`). Files `specs/NN-slug-vX.Y.Z.md`; jam specs under `specs/game-jam/`.
+- **[`openspec/`](openspec/) (OpenSpec)** — `/opsx:propose` → `/opsx:apply` → `/opsx:archive`. Changes are named like specs (e.g. `11-score-plausibility-caps-v0.2.5`), and so is their capability under `openspec/specs/<name>/spec.md`. Archive: `openspec/changes/archive/YYYY-MM-DD-<name>/`.
