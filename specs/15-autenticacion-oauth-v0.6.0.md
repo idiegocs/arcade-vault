@@ -3,7 +3,7 @@
 > **Estado:** Implementado
 > **Depende de:** 04-supabase-auth-scores (cliente de Supabase, `profiles`, trigger `handle_new_user`, Server Actions de auth)
 > **Fecha:** 2026-10-24
-> **Versión:** 0.5.2 → 0.6.0 (minor: funcionalidad nueva visible para el usuario)
+> **Versión:** 0.5.3 → 0.6.0 (minor: funcionalidad nueva visible para el usuario. El spec se escribió sobre 0.5.2; `master` pasó a 0.5.3 con el PR #24 antes del merge)
 > **Objetivo:** Que un jugador pueda crear su cuenta y entrar a Arcade Vault con Google, con GitHub o con usuario/email y contraseña, y recuperarla si olvida la contraseña.
 
 ## Alcance
