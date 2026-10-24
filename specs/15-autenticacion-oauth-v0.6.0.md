@@ -170,7 +170,7 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
 1. ✅ **Migración del trigger y búsqueda por usuario.**
    - Crear `sql/005_oauth_usernames_y_login_por_usuario.sql` y aplicarlo con `apply_migration`.
    - _Prueba:_ registrar una cuenta con email y contraseña sigue creando `profiles` con su `username`. Un `INSERT` de prueba en `auth.users` con solo `email` genera un usuario válido, que después se borra. `email_for_username` responde con `service_role` y da error de permiso con `anon`.
-2. **Errores en español y validación del registro.**
+2. ✅ **Errores en español y validación del registro.**
    - Crear `lib/auth-errors.ts` con `translateAuthError` y `safeNext`.
    - Usar `translateAuthError` en `signIn` y `signUp`.
    - En `signUp`, validar usuario `^[a-z0-9_]{3,16}$`, contraseña de al menos 8 caracteres y formato de email. Verificar que el usuario no exista consultando `profiles`.
@@ -341,6 +341,17 @@ Si alguno de estos llega a hacerse, va en su propio spec.
   - `email_for_username('PRUEBA_PWD')` → `pwd@x.com`, sin importar mayúsculas.
 - **Permisos:** `email_for_username` es ejecutable solo por `service_role`, no por `anon` ni `authenticated`. Después de la prueba quedan 0 usuarios de prueba y los mismos 3 perfiles.
 
+### Paso 2 — Errores y validación (2026-10-24)
+
+- `lib/auth-errors.ts`: `translateAuthError` busca fragmentos del mensaje de Supabase (en minúsculas) en una tabla ordenada. Si no reconoce el mensaje, devuelve un texto genérico en español, nunca el original en inglés.
+- `safeNext` ya quedó escrito, aunque se usa recién en los pasos 3 y 4. También rechaza `/\evil.com`, porque los navegadores lo tratan igual que `//evil.com`.
+- `signUp` pasa el usuario a minúsculas antes de validarlo (`IDIEGOCS` → `idiegocs`). Así "ya está en uso" funciona sin importar las mayúsculas.
+- `signIn` no necesita lógica extra para el error genérico: Supabase ya responde `Invalid login credentials` tanto si el correo no existe como si la contraseña está mal.
+- **Prueba con Playwright en `/auth`:** contraseña `abc`, usuario `Mal Usuario`, email `a@b`, usuario `IDIEGOCS` (ya tomado) y login con un correo inexistente. Los 5 casos muestran su mensaje en español.
+- No se probó un registro válido completo, para no crear una cuenta real en el proyecto.
+
 ### Lecciones aprendidas
 
 - Para probar triggers de `auth.users` en la base real sin dejar basura, sirve un bloque `DO` que inserta, junta el resultado en un texto y termina con `RAISE EXCEPTION`: el mensaje de error trae el resultado y la transacción se revierte entera.
+- En `/auth`, el `click()` de Playwright sobre las pestañas no llega a React, aunque la página esté hidratada. `dispatchEvent('click')` sí funciona. Antes de interactuar hay que esperar a que el botón tenga `__reactProps…`, porque si no el formulario se envía de forma nativa y la página se recarga.
+- Para probar validaciones de email, usar algo como `a@b`. Con `no-es-email`, el `type="email"` del navegador frena el envío y la Server Action nunca se ejecuta.
