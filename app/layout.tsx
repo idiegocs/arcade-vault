@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Press_Start_2P, Courier_Prime, JetBrains_Mono } from "next/font/google";
 import { Nav, Footer } from "@/components/nav";
-import { getSessionUsername } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 import "./globals.css";
 
 const pressStart2P = Press_Start_2P({
@@ -35,7 +35,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const username = await getSessionUsername();
+  const user = await getSessionUser();
 
   return (
     <html
@@ -46,7 +46,7 @@ export default async function RootLayout({
         <div className="av-bg" />
         <div className="av-noise" />
         <div id="root">
-          <Nav username={username} />
+          <Nav username={user?.username ?? null} login={user?.login ?? null} />
           <main className="av-main">{children}</main>
           <Footer />
         </div>

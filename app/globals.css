@@ -195,6 +195,19 @@ body:has(.av-player) .av-bg::before { animation: none; }
 .av-nav .auth-btn { margin-left: 16px; }
 .av-nav .nav-session { display: flex; align-items: center; gap: 10px; margin-left: 16px; }
 .av-nav .nav-session .nav-username { font-family: var(--pixel); font-size: 9px; color: var(--cyan); text-shadow: 0 0 8px rgba(0,245,255,0.5); }
+/* Ficha del método de ingreso: color del método en borde, glifo y glow. */
+.nav-provider {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; flex: none;
+  border: 1px solid currentColor; background: rgba(10, 10, 15, 0.8);
+  font-family: var(--mono); font-size: 11px; line-height: 1;
+  box-shadow: 0 0 6px currentColor, inset 0 0 4px rgba(255, 255, 255, 0.06);
+  text-shadow: 0 0 6px currentColor;
+}
+.nav-provider.email { color: var(--cyan); }
+.nav-provider.google { color: var(--magenta); }
+.nav-provider.github { color: var(--green); }
+.nav-mobile-logout { display: inline-flex; align-items: center; justify-content: flex-start; gap: 10px; text-align: left; }
 .av-nav .hamburger { display: none; }
 
 @media (max-width: 840px) {

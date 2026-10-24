@@ -36,7 +36,7 @@
   - El "Iniciar Sesión" del Nav pasa la página actual como `next`.
   - JUGAR COMO INVITADO lleva a `/games`.
 - **Separación de `/auth`:** `app/auth/page.tsx` pasa a ser Server Component (revisa la sesión y lee `next`). El formulario se muda a `components/auth-form.tsx`, que es Client Component.
-- **Método de ingreso en el Nav** _(agregado durante la implementación, 2026-10-24, a pedido del usuario)_: junto al usuario, el Nav muestra un ícono del método con el que se entró (◆ Google, ▣ GitHub o ✉ email/contraseña), con el texto "Entraste con …" como `title`. Se ve en desktop y en móvil.
+- **Método de ingreso en el Nav** _(agregado durante la implementación, 2026-10-24, a pedido del usuario)_: junto al usuario, el Nav muestra un ícono del método con el que se entró (◆ Google, ▣ GitHub o ✉ email/contraseña), con el texto "Entraste con … · <cuenta>" como `title` (email de Google, `@usuario` de GitHub o el correo). Es el método de **esta** sesión. Se ve en desktop y en móvil.
 - **Versión real en la tarjeta:** `ACCESO AL SISTEMA · v2.6` pasa a mostrar la versión de `package.json`.
 - **Guía de configuración en el spec:** pasos para crear el OAuth Client en Google Cloud y la OAuth App en GitHub, cargarlos en Supabase → Authentication → Providers, y registrar las Redirect URLs de `localhost:3000`. También cómo copiar `SUPABASE_SECRET_KEY`. Esa parte la hace el usuario.
 - Bump a `0.6.0` en `package.json` y entrada nueva en `CHANGELOG.md`.
@@ -206,11 +206,11 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
    - Agregar `signInWithProvider` con `redirectTo` a `/auth/callback?next=…`.
    - Conectar los botones ◆ GOOGLE y ▣ GITHUB, que muestran "CONECTANDO…" mientras esperan.
    - _Prueba:_ el primer ingreso con cada proveedor crea `profiles` con un usuario generado, y el Nav lo muestra. El segundo ingreso no crea un perfil nuevo.
-   - **6b. Método de ingreso en el Nav** _(agregado durante la implementación)_:
-     - `lib/session.ts` suma `getSessionUser(): Promise<{ username: string; provider: "email" | "google" | "github" } | null>`. El proveedor es el de la identidad de `user.identities` con el `last_sign_in_at` más reciente. `getSessionUsername()` se mantiene para `app/juegos/[id]/jugar/page.tsx`.
+   - ✅ **6b. Método de ingreso en el Nav** _(agregado durante la implementación)_:
+     - `lib/session.ts` suma `getSessionUser(): Promise<{ username: string; login: { provider: "email" | "google" | "github"; account: string | null } } | null>`. El método sale del `amr` de la sesión (`getClaims()`): `password` → email; `oauth` → la identidad Google/GitHub con el `updated_at` más reciente. `account` es el email o el `@usuario` de esa identidad. `getSessionUsername()` se mantiene para `app/juegos/[id]/jugar/page.tsx`.
      - `app/layout.tsx` usa `getSessionUser()` y le pasa `provider` al `Nav`.
      - `components/nav.tsx` muestra el ícono antes del usuario, en desktop y en el menú móvil. El diseño se hace con `/frontend-design`, como pide `CLAUDE.md`.
-     - _Prueba:_ entrar con contraseña muestra ✉, con Google muestra ◆ y con GitHub muestra ▣. El `title` dice "Entraste con …".
+     - _Prueba:_ entrar con contraseña muestra ✉, con Google muestra ◆ y con GitHub muestra ▣. El `title` dice "Entraste con … · <cuenta>".
 7. **Olvidé mi contraseña.**
    - Agregar el enlace "¿Olvidaste tu contraseña?" en `/auth`, que abre el formulario de email.
    - Agregar `requestPasswordReset`, que llama a `resetPasswordForEmail` con `redirectTo` a `/auth/callback?next=/auth/restablecer`. Siempre responde `{ notice: "reset-sent" }`, para no revelar si el email existe.
@@ -243,10 +243,10 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
 
 ### Método de ingreso en el Nav
 
-- [ ] Con sesión iniciada por contraseña, el Nav muestra ✉ junto al usuario, y su `title` es "Entraste con correo y contraseña".
-- [ ] Con sesión iniciada por Google, el Nav muestra ◆, y su `title` es "Entraste con Google".
-- [ ] Con sesión iniciada por GitHub, el Nav muestra ▣, y su `title` es "Entraste con GitHub".
-- [ ] Una cuenta con varios métodos vinculados muestra el último que se usó para entrar.
+- [ ] Con sesión iniciada por contraseña, el Nav muestra ✉ junto al usuario, y su `title` es "Entraste con correo y contraseña · <correo>".
+- [ ] Con sesión iniciada por Google, el Nav muestra ◆, y su `title` es "Entraste con Google · <email de Google>".
+- [ ] Con sesión iniciada por GitHub, el Nav muestra ▣, y su `title` es "Entraste con GitHub · @<usuario de GitHub>".
+- [ ] Una cuenta con varios métodos vinculados muestra el método con el que se inició **esta** sesión, no el último usado en otro dispositivo.
 - [ ] El ícono se ve en el Nav de desktop y en el menú móvil.
 
 ### Recuperar contraseña
@@ -286,8 +286,10 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
 - **Sí:** soportar "Confirm email" activado y desactivado. La configuración del proyecto no se puede leer con las herramientas disponibles y puede cambiar.
 - **Sí:** `safeNext` acepta solo rutas que empiezan con `/` y no con `//`. Evita usar el login para redirigir a sitios externos.
 - **Sí:** mostrar el método de ingreso en el Nav, agregado durante la implementación a pedido del usuario. Ahora que hay tres formas de entrar, sirve para saber con cuál se está.
-- **Sí:** tomar el método de la identidad con el `last_sign_in_at` más reciente.
-- **No:** usar `app_metadata.provider`, porque guarda el método con el que se **creó** la cuenta, no el último usado. Tampoco el `amr` del JWT, que dice `oauth` sin aclarar si fue Google o GitHub.
+- **Sí:** el método de **esta** sesión, leído del `amr` del JWT (`getClaims()`). Si es `oauth`, el proveedor sale de la identidad Google/GitHub con el `updated_at` más reciente. _(Corregido durante el paso 6b: ver la bitácora.)_
+- **No:** la identidad con el `last_sign_in_at` más reciente. Supabase solo escribe ese campo al **vincular** la identidad, no en los ingresos siguientes, y además describe a la cuenta, no a la sesión. El usuario entró con Google y veía ▣.
+- **No:** `app_metadata.provider`, porque guarda el método con el que se **creó** la cuenta.
+- **Sí:** el tooltip incluye la cuenta del método (email de Google, `@usuario` de GitHub o el correo), a pedido del usuario. Solo lo ve el propio jugador en su Nav.
 - **Sí:** reusar los símbolos ◆ y ▣ de los botones de `/auth`, y agregar ✉ para email. El Nav y la tarjeta usan el mismo lenguaje visual, sin logos de marca.
 - **Sí:** separar `/auth` en Server Component y `components/auth-form.tsx`. La redirección con sesión se hace en el servidor, sin mostrar el formulario un instante.
 - **Sí:** solo `http://localhost:3000` por ahora. Producción es solo configuración y va en otro spec.
@@ -432,9 +434,32 @@ Si alguno de estos llega a hacerse, va en su propio spec.
 - **Sin probar con cuentas reales:** el primer ingreso de una cuenta OAuth _nueva_, cuando el trigger genera el username. Solo está probado con inserts simulados (pasos 1 y 3). Hace falta una cuenta de Google o GitHub con un email que no esté en el proyecto.
 - El usuario contó que antes "los botones no hacían nada": había probado antes de este paso, cuando todavía eran `type="button"` sin acción.
 
+### Paso 6b — Método de ingreso en el Nav (2026-10-24)
+
+- Lo pidió el usuario a mitad del paso 6. Se sumó al spec (alcance, plan, criterios y decisiones) antes de escribir el código, y el diseño se hizo con `/frontend-design`.
+- **Diseño:**
+  - Una ficha cuadrada de 20 px, tipo ranura de cartucho, con borde, glifo y glow (`currentColor`) del color del método: email cyan, que es el mismo del username; Google magenta; GitHub verde. No se usa amarillo, porque es el color de los créditos.
+  - No tiene animación.
+  - `✉` lleva `U+FE0E` para que Windows no lo dibuje como emoji a color.
+  - En el menú móvil va dentro de "Salir (USUARIO)", alineada a la izquierda como el resto del menú.
+- **Bug de la primera versión, que encontró el usuario** ("entro con Google y sale el icono de GitHub"):
+  - El spec decía que había que tomar la identidad con el `last_sign_in_at` más reciente.
+  - En la base, la identidad `google` seguía con `last_sign_in_at = 16:37:16` (el primer vínculo), aunque su `updated_at` era `16:45:32`, el ingreso de ese momento. **Supabase no actualiza `last_sign_in_at` en los ingresos siguientes.**
+  - La sesión nueva tenía `amr = [{method: "oauth"}]`.
+  - Corrección: el método sale del `amr` de _esta_ sesión, con `getClaims()`. Si es `oauth`, se usa la identidad Google/GitHub con el `updated_at` más reciente.
+  - También se corrigió un criterio: ahora se muestra el método de esta sesión, no el último usado en otro dispositivo.
+- **Tooltip con la cuenta** (también lo pidió el usuario): "Entraste con Google · email", "Entraste con GitHub · @usuario" o "Entraste con correo y contraseña · correo". Sale de `identity_data.email` / `identity_data.user_name`, o de `user.email`. `getSessionUser()` devuelve ahora `{ username, login: { provider, account } }`.
+- **CSS que no se aplicaba:** las reglas nuevas de `app/globals.css` no aparecían en el CSS servido, ni siquiera reiniciando el dev server. Se arregló borrando `.next/`, que tenía la caché persistente de Turbopack.
+- **Prueba** con la cuenta temporal `prueba_spec15`, que se borró al final:
+  - Con contraseña, la ficha `email` mide 20×20 y tiene borde de 1 px. Su `title` es "Entraste con correo y contraseña · prueba_spec15@example.com".
+  - En el móvil (390 px), la ficha aparece dentro de "Salir (PRUEBA_SPEC15)".
+  - Los casos ◆ Google y ▣ GitHub los tiene que confirmar el usuario con sus cuentas.
+
 ### Lecciones aprendidas
 
 - Para probar triggers de `auth.users` en la base real sin dejar basura, sirve un bloque `DO` que inserta, junta el resultado en un texto y termina con `RAISE EXCEPTION`: el mensaje de error trae el resultado y la transacción se revierte entera.
 - En `/auth`, el `click()` de Playwright sobre las pestañas no llega a React, aunque la página esté hidratada. `dispatchEvent('click')` sí funciona. Antes de interactuar hay que esperar a que el botón tenga `__reactProps…`, porque si no el formulario se envía de forma nativa y la página se recarga.
 - Para probar "Salir" en Playwright, no alcanza con esperar la URL `/`: si la página ya estaba en `/`, esa condición se cumple antes de que termine la salida. Hay que esperar a que aparezca el enlace "Iniciar Sesión" (`a.auth-btn`).
+- `auth.identities.last_sign_in_at` no sirve para saber con qué se entró: Supabase solo lo escribe cuando se vincula la identidad. Para la sesión actual hay que mirar el `amr` del JWT, y para distinguir entre proveedores OAuth, el `updated_at` de la identidad.
+- Si un cambio en `app/globals.css` no aparece en el navegador después de reiniciar `npm run dev`, hay que borrar `.next/`. La caché persistente de Turbopack puede seguir sirviendo el CSS viejo.
 - Para probar validaciones de email, usar algo como `a@b`. Con `no-es-email`, el `type="email"` del navegador frena el envío y la Server Action nunca se ejecuta.
