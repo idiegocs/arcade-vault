@@ -216,7 +216,7 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
    - Agregar `requestPasswordReset`, que llama a `resetPasswordForEmail` con `redirectTo` a `/auth/callback?next=/auth/restablecer`. Siempre responde `{ notice: "reset-sent" }`, para no revelar si el email existe.
    - Crear `app/auth/restablecer/page.tsx`, que pide contraseña y confirmación y llama a `updatePassword`. Sin sesión, redirige a `/auth`.
    - _Prueba:_ llega el correo, el enlace abre `/auth/restablecer`, se cambia la contraseña y se puede entrar con la nueva.
-8. **Versión y documentación.**
+8. ✅ **Versión y documentación.**
    - Bump a `0.6.0` en `package.json`.
    - Entrada `[0.6.0]` en `CHANGELOG.md` con enlace a este spec.
 
@@ -474,6 +474,9 @@ Si alguno de estos llega a hacerse, va en su propio spec.
   4. Con sesión, `/auth/restablecer` muestra `PRUEBA_SPEC15@EXAMPLE.COM`. Una clave corta y dos claves distintas muestran sus errores.
   5. Con una clave válida se guarda. Después, entrar con la clave vieja → "Usuario o contraseña incorrectos." y con la nueva → `/`.
 - **Pendiente de prueba manual:** el correo real y su enlace. El SMTP por defecto de Supabase solo entrega a miembros del equipo del proyecto y tiene un límite bajo por hora. Hay que probarlo con el correo de `idiegocs`. Para jugadores reales hace falta un SMTP propio (por ejemplo, Resend, que ya usa el formulario de contacto). Queda fuera de este spec.
+- **Prueba manual del correo real (el usuario):**
+  - En el primer intento, el enlace llevó a `/?code=…` (la Site URL) en lugar de `/auth/callback`, y no apareció la pantalla de contraseña. Las causas probables: el enlace se pidió desde otro origen (`192.168.68.60`, la IP del dev server en la red local), que no está en Redirect URLs, así que Supabase lo descartó y usó la Site URL; y además se abrió en otro dispositivo, sin la cookie del code verifier de PKCE.
+  - **En el segundo intento funcionó:** pedido y clic en el mismo navegador, por `localhost:3000`, y llegó a NUEVA CONTRASEÑA.
 - El CSS nuevo tampoco se aplicó esta vez hasta borrar `.next/` y reiniciar. Pasa siempre con `globals.css` en este proyecto.
 
 ### Lecciones aprendidas
@@ -483,5 +486,6 @@ Si alguno de estos llega a hacerse, va en su propio spec.
 - Para probar "Salir" en Playwright, no alcanza con esperar la URL `/`: si la página ya estaba en `/`, esa condición se cumple antes de que termine la salida. Hay que esperar a que aparezca el enlace "Iniciar Sesión" (`a.auth-btn`).
 - `auth.identities.last_sign_in_at` no sirve para saber con qué se entró: Supabase solo lo escribe cuando se vincula la identidad. Para la sesión actual hay que mirar el `amr` del JWT, y para distinguir entre proveedores OAuth, el `updated_at` de la identidad.
 - En este proyecto, con `npm run dev` corriendo, los cambios en `app/globals.css` **no** se aplican: ni con HMR ni reiniciando. Hay que parar el servidor, borrar `.next/` y volver a levantarlo. La caché persistente de Turbopack sigue sirviendo el CSS viejo. Pasó en los pasos 6b y 7.
+- Los enlaces de Supabase (recuperación, confirmación y OAuth) se **piden y se abren en el mismo navegador**, porque el code verifier de PKCE vive en una cookie de ese navegador. Además, el origen tiene que estar en Redirect URLs o ser el host de la Site URL. Si no lo está, Supabase lo cambia sin avisar por la Site URL y se llega a `/?code=…`.
 - En Playwright, esperar `.contact-error` después de un segundo envío puede devolver el error **anterior**, que sigue en pantalla. Para saber si un envío funcionó, hay que mirar el efecto: la URL o un login posterior.
 - Para probar validaciones de email, usar algo como `a@b`. Con `no-es-email`, el `type="email"` del navegador frena el envío y la Server Action nunca se ejecuta.

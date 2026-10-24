@@ -6,6 +6,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.6.0] - 2026-10-24
+
+Spec: [`15-autenticacion-oauth-v0.6.0`](specs/15-autenticacion-oauth-v0.6.0.md)
+
+### Added
+
+- Entrar con Google o con GitHub. Si el correo coincide con el de una cuenta existente, se vincula a esa cuenta. Si no, se crea una con un usuario generado a partir del nombre de GitHub o del correo.
+- Entrar con el usuario o con el correo, en el mismo campo.
+- "¿Olvidaste tu contraseña?": un enlace por correo lleva a `/auth/restablecer` para elegir una contraseña nueva.
+- Aviso "REVISA TU CORREO" al registrarse, si el proyecto pide confirmar el correo.
+- Ícono del método de ingreso junto al usuario en el Nav (✉ correo, ◆ Google, ▣ GitHub). Al pasar el mouse muestra con qué cuenta se entró.
+
+### Changed
+
+- El registro valida el usuario (3 a 16 caracteres: letras, números o `_`, sin repetir), el correo y la contraseña (mínimo 8 caracteres).
+- Los errores de inicio de sesión y registro se muestran en español. Un usuario inexistente y una contraseña incorrecta dan el mismo mensaje.
+- Después de entrar se vuelve a la página desde la que se hizo clic en "Iniciar Sesión". Con la sesión iniciada, `/auth` lleva al inicio.
+- JUGAR COMO INVITADO lleva a la biblioteca de juegos.
+- La pantalla de acceso muestra la versión real de la app, que antes decía `v2.6`.
+
 ## [0.5.2] - 2026-10-12
 
 Spec: [`14-rendimiento-motores-v0.5.2`](specs/14-rendimiento-motores-v0.5.2.md)
