@@ -64,6 +64,18 @@ async function sessionLogin(
   return { provider: latest.provider as LoginProvider, account };
 }
 
+/**
+ * true si la sesión actual la creó un enlace de recuperación de contraseña
+ * (`amr` = `recovery`). /auth/restablecer y `updatePassword` lo exigen: con
+ * cualquier otra sesión se podría cambiar la contraseña sin conocer la actual.
+ */
+export async function isRecoverySession(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const amr = (data?.claims.amr ?? []) as { method: string }[];
+  return amr.some((entry) => entry.method === "recovery");
+}
+
 /** Username del usuario con sesión activa, o null si no hay sesión. */
 export async function getSessionUsername(): Promise<string | null> {
   return (await getSessionUser())?.username ?? null;

@@ -39,13 +39,22 @@ export function translateAuthError(message: string): string {
   return match ? match[1] : GENERIC_ERROR;
 }
 
+// Origen ficticio para resolver `next` como lo haría el navegador.
+const SAFE_NEXT_BASE = "http://arcade-vault.invalid";
+
 /**
  * Destino seguro tras iniciar sesión: solo rutas internas ("/juegos/caida").
- * "//evil.com" y "/\evil.com" los navegadores los tratan como URLs externas.
+ * No alcanza con mirar el prefijo: el parser de URLs descarta tabs y saltos
+ * de línea y trata "\" como "/", así que "/\t/evil.com" o "/\evil.com"
+ * terminan en otro host. Se resuelve la URL y se exige que el origen no cambie.
  */
 export function safeNext(next: string | null | undefined): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) {
+  if (!next || !next.startsWith("/")) return "/";
+  try {
+    const url = new URL(next, SAFE_NEXT_BASE);
+    if (url.origin !== SAFE_NEXT_BASE) return "/";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
     return "/";
   }
-  return next;
 }

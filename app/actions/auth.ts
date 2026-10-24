@@ -3,7 +3,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { INVALID_CREDENTIALS, safeNext, translateAuthError } from "@/lib/auth-errors";
+import { INVALID_CREDENTIALS, LINK_EXPIRED, safeNext, translateAuthError } from "@/lib/auth-errors";
+import { isRecoverySession } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AuthFormState =
@@ -145,6 +146,11 @@ export async function updatePassword(
   }
   if (password !== confirm) {
     return { error: "Las contraseñas no coinciden." };
+  }
+
+  // La página ya lo exige, pero la Server Action se puede invocar sin pasar por ella.
+  if (!(await isRecoverySession())) {
+    return { error: LINK_EXPIRED };
   }
 
   const supabase = await createClient();
