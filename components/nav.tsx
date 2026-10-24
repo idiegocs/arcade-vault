@@ -4,12 +4,31 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut } from "@/app/actions/auth";
+import type { LoginProvider, SessionLogin } from "@/lib/session";
 import { version } from "@/package.json";
 import { isMuted, toggleMuted } from "./games/audio";
 
 type NavTarget = "inicio" | "biblioteca" | "salon" | "acerca" | "auth";
 
-export function Nav({ username }: { username: string | null }) {
+// ✉ lleva U+FE0E para que se dibuje como texto y no como emoji a color.
+const PROVIDER_BADGE: Record<LoginProvider, { glyph: string; label: string }> = {
+  email: { glyph: "✉︎", label: "Entraste con correo y contraseña" },
+  google: { glyph: "◆", label: "Entraste con Google" },
+  github: { glyph: "▣", label: "Entraste con GitHub" },
+};
+
+// El tooltip suma la cuenta del método: "Entraste con Google · tu@gmail.com".
+function ProviderBadge({ login }: { login: SessionLogin }) {
+  const { glyph, label } = PROVIDER_BADGE[login.provider];
+  const title = login.account ? `${label} · ${login.account}` : label;
+  return (
+    <span className={`nav-provider ${login.provider}`} role="img" aria-label={title} title={title}>
+      {glyph}
+    </span>
+  );
+}
+
+export function Nav({ username, login }: { username: string | null; login: SessionLogin | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   // Arranca en `false` para calzar con el render del servidor (no hay
@@ -36,6 +55,12 @@ export function Nav({ username }: { username: string | null }) {
   };
 
   const close = () => setOpen(false);
+
+  // Tras entrar, /auth vuelve a la página desde la que se hizo clic.
+  const authHref =
+    pathname === "/" || pathname.startsWith("/auth")
+      ? "/auth"
+      : `/auth?next=${encodeURIComponent(pathname)}`;
 
   return (
     <>
@@ -76,13 +101,14 @@ export function Nav({ username }: { username: string | null }) {
         </button>
         {username ? (
           <form action={signOut} className="nav-session">
+            {login && <ProviderBadge login={login} />}
             <span className="nav-username mono">{username.toUpperCase()}</span>
             <button type="submit" className="btn ghost">
               Salir
             </button>
           </form>
         ) : (
-          <Link href="/auth" className="btn auth-btn">
+          <Link href={authHref} className="btn auth-btn">
             Iniciar Sesión
           </Link>
         )}
@@ -119,12 +145,13 @@ export function Nav({ username }: { username: string | null }) {
         </Link>
         {username ? (
           <form action={signOut}>
-            <button type="submit" style={{ width: "100%" }}>
+            <button type="submit" className="nav-mobile-logout" style={{ width: "100%" }}>
+              {login && <ProviderBadge login={login} />}
               Salir ({username.toUpperCase()})
             </button>
           </form>
         ) : (
-          <Link href="/auth" className={isActive("auth") ? "active" : ""} onClick={close}>
+          <Link href={authHref} className={isActive("auth") ? "active" : ""} onClick={close}>
             Iniciar Sesión
           </Link>
         )}
