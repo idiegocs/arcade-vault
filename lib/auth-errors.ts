@@ -7,6 +7,8 @@ export const INVALID_CREDENTIALS = "Usuario o contraseña incorrectos.";
 
 export const LINK_EXPIRED = "El enlace expiró. Pide uno nuevo.";
 
+export const PROVIDER_UNAVAILABLE = "Proveedor no disponible. Prueba con otro método.";
+
 const GENERIC_ERROR = "Algo salió mal. Intenta de nuevo en unos segundos.";
 
 // Fragmentos (en minúsculas) de los mensajes de Supabase → texto en español.

@@ -109,6 +109,35 @@ export async function signIn(
   redirect(safeNext(formData.get("next") as string | null));
 }
 
+const PROVIDERS = ["google", "github"] as const;
+type Provider = (typeof PROVIDERS)[number];
+
+/**
+ * Google / GitHub. Supabase devuelve la URL del proveedor; tras autorizar,
+ * vuelve a /auth/callback, que crea la sesión (el code verifier de PKCE ya
+ * quedó en una cookie acá). Un error redirige a /auth?error=proveedor.
+ */
+export async function signInWithProvider(formData: FormData) {
+  const provider = formData.get("provider") as string | null;
+  const next = safeNext(formData.get("next") as string | null);
+
+  if (!PROVIDERS.includes(provider as Provider)) {
+    redirect("/auth?error=proveedor");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: provider as Provider,
+    options: { redirectTo: await callbackUrl(next) },
+  });
+
+  if (error || !data.url) {
+    redirect("/auth?error=proveedor");
+  }
+
+  redirect(data.url);
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

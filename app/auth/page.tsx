@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
-import { LINK_EXPIRED, safeNext } from "@/lib/auth-errors";
+import { LINK_EXPIRED, PROVIDER_UNAVAILABLE, safeNext } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AuthPage({
@@ -23,7 +23,9 @@ export default async function AuthPage({
   return (
     <AuthForm
       next={safeNext(typeof next === "string" ? next : null)}
-      linkError={error === "enlace" ? LINK_EXPIRED : null}
+      linkError={
+        error === "enlace" ? LINK_EXPIRED : error === "proveedor" ? PROVIDER_UNAVAILABLE : null
+      }
     />
   );
 }

@@ -36,6 +36,7 @@
   - El "Iniciar Sesión" del Nav pasa la página actual como `next`.
   - JUGAR COMO INVITADO lleva a `/games`.
 - **Separación de `/auth`:** `app/auth/page.tsx` pasa a ser Server Component (revisa la sesión y lee `next`). El formulario se muda a `components/auth-form.tsx`, que es Client Component.
+- **Método de ingreso en el Nav** _(agregado durante la implementación, 2026-10-24, a pedido del usuario)_: junto al usuario, el Nav muestra un ícono del método con el que se entró (◆ Google, ▣ GitHub o ✉ email/contraseña), con el texto "Entraste con …" como `title`. Se ve en desktop y en móvil.
 - **Versión real en la tarjeta:** `ACCESO AL SISTEMA · v2.6` pasa a mostrar la versión de `package.json`.
 - **Guía de configuración en el spec:** pasos para crear el OAuth Client en Google Cloud y la OAuth App en GitHub, cargarlos en Supabase → Authentication → Providers, y registrar las Redirect URLs de `localhost:3000`. También cómo copiar `SUPABASE_SECRET_KEY`. Esa parte la hace el usuario.
 - Bump a `0.6.0` en `package.json` y entrada nueva en `CHANGELOG.md`.
@@ -200,11 +201,16 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
    - `signIn` recibe `identifier`: si no tiene `@`, consulta `rpc("email_for_username")` y después llama a `signInWithPassword`.
    - El campo pasa a llamarse "Usuario o correo".
    - _Prueba:_ se entra con el usuario y con el email. Un usuario inexistente muestra el mismo error genérico que una contraseña incorrecta.
-6. **Google y GitHub.**
+6. ✅ **Google y GitHub.**
    - _Pausa:_ el usuario configura los dos proveedores (Anexo, C y D).
    - Agregar `signInWithProvider` con `redirectTo` a `/auth/callback?next=…`.
    - Conectar los botones ◆ GOOGLE y ▣ GITHUB, que muestran "CONECTANDO…" mientras esperan.
    - _Prueba:_ el primer ingreso con cada proveedor crea `profiles` con un usuario generado, y el Nav lo muestra. El segundo ingreso no crea un perfil nuevo.
+   - **6b. Método de ingreso en el Nav** _(agregado durante la implementación)_:
+     - `lib/session.ts` suma `getSessionUser(): Promise<{ username: string; provider: "email" | "google" | "github" } | null>`. El proveedor es el de la identidad de `user.identities` con el `last_sign_in_at` más reciente. `getSessionUsername()` se mantiene para `app/juegos/[id]/jugar/page.tsx`.
+     - `app/layout.tsx` usa `getSessionUser()` y le pasa `provider` al `Nav`.
+     - `components/nav.tsx` muestra el ícono antes del usuario, en desktop y en el menú móvil. El diseño se hace con `/frontend-design`, como pide `CLAUDE.md`.
+     - _Prueba:_ entrar con contraseña muestra ✉, con Google muestra ◆ y con GitHub muestra ▣. El `title` dice "Entraste con …".
 7. **Olvidé mi contraseña.**
    - Agregar el enlace "¿Olvidaste tu contraseña?" en `/auth`, que abre el formulario de email.
    - Agregar `requestPasswordReset`, que llama a `resetPasswordForEmail` con `redirectTo` a `/auth/callback?next=/auth/restablecer`. Siempre responde `{ notice: "reset-sent" }`, para no revelar si el email existe.
@@ -234,6 +240,14 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
 - [ ] El primer ingreso con OAuth crea `profiles` con un usuario válido (`^[a-z0-9_]{3,16}$`), sin el error "Database error saving new user".
 - [ ] Si el usuario generado ya existe, se le agrega un sufijo numérico (`px_kai` → `px_kai1`).
 - [ ] Un segundo ingreso con el mismo proveedor no crea otra fila en `profiles`.
+
+### Método de ingreso en el Nav
+
+- [ ] Con sesión iniciada por contraseña, el Nav muestra ✉ junto al usuario, y su `title` es "Entraste con correo y contraseña".
+- [ ] Con sesión iniciada por Google, el Nav muestra ◆, y su `title` es "Entraste con Google".
+- [ ] Con sesión iniciada por GitHub, el Nav muestra ▣, y su `title` es "Entraste con GitHub".
+- [ ] Una cuenta con varios métodos vinculados muestra el último que se usó para entrar.
+- [ ] El ícono se ve en el Nav de desktop y en el menú móvil.
 
 ### Recuperar contraseña
 
@@ -271,6 +285,10 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
 - **Sí:** una sola ruta `/auth/callback` para OAuth, confirmación de email y recuperación. Las tres usan el mismo intercambio de `code` por sesión.
 - **Sí:** soportar "Confirm email" activado y desactivado. La configuración del proyecto no se puede leer con las herramientas disponibles y puede cambiar.
 - **Sí:** `safeNext` acepta solo rutas que empiezan con `/` y no con `//`. Evita usar el login para redirigir a sitios externos.
+- **Sí:** mostrar el método de ingreso en el Nav, agregado durante la implementación a pedido del usuario. Ahora que hay tres formas de entrar, sirve para saber con cuál se está.
+- **Sí:** tomar el método de la identidad con el `last_sign_in_at` más reciente.
+- **No:** usar `app_metadata.provider`, porque guarda el método con el que se **creó** la cuenta, no el último usado. Tampoco el `amr` del JWT, que dice `oauth` sin aclarar si fue Google o GitHub.
+- **Sí:** reusar los símbolos ◆ y ▣ de los botones de `/auth`, y agregar ✉ para email. El Nav y la tarjeta usan el mismo lenguaje visual, sin logos de marca.
 - **Sí:** separar `/auth` en Server Component y `components/auth-form.tsx`. La redirección con sesión se hace en el servidor, sin mostrar el formulario un instante.
 - **Sí:** solo `http://localhost:3000` por ahora. Producción es solo configuración y va en otro spec.
 - **Sí:** mostrar la versión real en la tarjeta. `v2.6` estaba escrito a mano y no coincidía con `package.json`.
@@ -400,6 +418,19 @@ Si alguno de estos llega a hacerse, va en su propio spec.
   - Un usuario inexistente y una contraseña incorrecta muestran lo mismo: "Usuario o contraseña incorrectos."
 - **Con la clave pública** (`curl` a `/rest/v1/rpc/email_for_username`), la respuesta es `HTTP 401`, `42501 permission denied for function email_for_username`.
 - **Observación:** el paquete `server-only` no está instalado. La protección contra importar `lib/supabase/admin.ts` desde el cliente depende de la convención y del criterio que revisa `.next/static`. Agregarlo (`npm i server-only` + `import "server-only"`) sería una dependencia nueva que el spec no incluye.
+
+### Paso 6 — Google y GitHub (2026-10-24)
+
+- El usuario configuró los dos proveedores en Supabase antes de que se escribiera el código.
+- `signInWithProvider(formData)`:
+  - Acepta solo `google` o `github`. Arma `redirectTo` con `callbackUrl(next)` y hace `redirect(data.url)`.
+  - El `@supabase/ssr` del servidor guarda el code verifier de PKCE en una cookie, que `/auth/callback` usa en `exchangeCodeForSession`.
+  - Si hay un error, manda a `/auth?error=proveedor`, que muestra `PROVIDER_UNAVAILABLE`. Así se evita un estado de error dentro del formulario.
+- Cada botón es su propio `<form action={signInWithProvider}>` con `provider` y `next` ocultos. El texto "CONECTANDO…" sale de `useFormStatus`, en un componente hijo, porque ese hook solo ve el form que lo contiene.
+- **Prueba automática** (contexto sin cookies): ◆ GOOGLE lleva a `accounts.google.com`, con `redirect_uri` igual a `https://<ref>.supabase.co/auth/v1/callback`. ▣ GITHUB lleva a `github.com/login`. En los dos casos queda la cookie `…-code-verifier`.
+- **Prueba manual** (el usuario, en incógnito): entró con Google y con GitHub. En `auth.identities` aparecen `google` (16:37:16) y `github` (16:37:34), **las dos vinculadas a la cuenta existente `idiegocs`**, porque el email es el mismo. No se creó un perfil nuevo.
+- **Sin probar con cuentas reales:** el primer ingreso de una cuenta OAuth _nueva_, cuando el trigger genera el username. Solo está probado con inserts simulados (pasos 1 y 3). Hace falta una cuenta de Google o GitHub con un email que no esté en el proyecto.
+- El usuario contó que antes "los botones no hacían nada": había probado antes de este paso, cuando todavía eran `type="button"` sin acción.
 
 ### Lecciones aprendidas
 

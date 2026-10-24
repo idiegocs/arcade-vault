@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { signIn, signUp } from "@/app/actions/auth";
+import { useFormStatus } from "react-dom";
+import { signIn, signInWithProvider, signUp } from "@/app/actions/auth";
 import { version } from "@/package.json";
 
 /**
@@ -148,12 +149,8 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
 
         <div className="auth-divider">O CONTINÚA CON</div>
         <div className="social">
-          <button className="btn ghost" type="button">
-            ◆ GOOGLE
-          </button>
-          <button className="btn ghost" type="button">
-            ▣ GITHUB
-          </button>
+          <ProviderButton provider="google" label="◆ GOOGLE" next={next} />
+          <ProviderButton provider="github" label="▣ GITHUB" next={next} />
         </div>
 
         <div
@@ -169,5 +166,34 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
         </div>
       </div>
     </div>
+  );
+}
+
+/** Un form por proveedor: la Server Action redirige a Google/GitHub. */
+function ProviderButton({
+  provider,
+  label,
+  next,
+}: {
+  provider: "google" | "github";
+  label: string;
+  next: string;
+}) {
+  return (
+    <form action={signInWithProvider}>
+      <input type="hidden" name="provider" value={provider} />
+      <input type="hidden" name="next" value={next} />
+      <ProviderSubmit label={label} />
+    </form>
+  );
+}
+
+// useFormStatus solo ve el form que lo contiene, por eso va en un hijo.
+function ProviderSubmit({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button className="btn ghost" type="submit" disabled={pending} style={{ width: "100%" }}>
+      {pending ? "CONECTANDO…" : label}
+    </button>
   );
 }
