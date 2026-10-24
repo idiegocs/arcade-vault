@@ -194,7 +194,7 @@ Cada paso deja la app funcionando y se puede commitear por separado. Los pasos 5
    - JUGAR COMO INVITADO lleva a `/games`, y `v2.6` se reemplaza por la `version` de `@/package.json`.
    - `components/nav.tsx` arma `/auth?next=<ruta actual>` en desktop y móvil.
    - _Prueba:_ con sesión, `/auth` lleva a `/`. Entrando desde `/juegos/caida` se vuelve a `/juegos/caida`. `?next=https://evil.com` y `?next=//evil.com` terminan en `/`.
-5. **Ingreso con usuario o email.**
+5. ✅ **Ingreso con usuario o email.**
    - _Pausa:_ el usuario agrega `SUPABASE_SECRET_KEY` a `.env.local` (Anexo, A).
    - Crear `lib/supabase/admin.ts`.
    - `signIn` recibe `identifier`: si no tiene `@`, consulta `rpc("email_for_username")` y después llama a `signInWithPassword`.
@@ -389,8 +389,21 @@ Si alguno de estos llega a hacerse, va en su propio spec.
   7. Registro desde ahí → `/juegos/caida`.
   8. Salir y volver a entrar con contraseña → `/juegos/caida`.
 
+### Paso 5 — Ingreso con usuario o email (2026-10-24)
+
+- El usuario agregó `SUPABASE_SECRET_KEY` a `.env.local`, que está en `.gitignore`. Hubo que reiniciar el dev server para que la leyera.
+- `lib/supabase/admin.ts`: `createAdminClient()` usa `@supabase/supabase-js` con la secret key, `persistSession: false` y `autoRefreshToken: false`, y no maneja cookies. Solo lo importa `app/actions/auth.ts`.
+- `signIn` lee `identifier`. Si no contiene `@`, llama a `rpc("email_for_username")` con el cliente admin. Si no encuentra el usuario, devuelve `INVALID_CREDENTIALS` sin llamar a Supabase Auth: es el mismo mensaje que una contraseña incorrecta.
+- En la pestaña INICIAR SESIÓN, el campo se llama "Usuario o correo" (`name="identifier"`, `type="text"`, `autoComplete="username"`). En CREAR CUENTA sigue siendo `email`.
+- **Prueba con Playwright**, en un contexto sin cookies y con la cuenta temporal `prueba_spec15`, que se borró al final:
+  - Entrar con `prueba_spec15`, con `PRUEBA_SPEC15` o con el email funciona, y el Nav muestra `PRUEBA_SPEC15`.
+  - Un usuario inexistente y una contraseña incorrecta muestran lo mismo: "Usuario o contraseña incorrectos."
+- **Con la clave pública** (`curl` a `/rest/v1/rpc/email_for_username`), la respuesta es `HTTP 401`, `42501 permission denied for function email_for_username`.
+- **Observación:** el paquete `server-only` no está instalado. La protección contra importar `lib/supabase/admin.ts` desde el cliente depende de la convención y del criterio que revisa `.next/static`. Agregarlo (`npm i server-only` + `import "server-only"`) sería una dependencia nueva que el spec no incluye.
+
 ### Lecciones aprendidas
 
 - Para probar triggers de `auth.users` en la base real sin dejar basura, sirve un bloque `DO` que inserta, junta el resultado en un texto y termina con `RAISE EXCEPTION`: el mensaje de error trae el resultado y la transacción se revierte entera.
 - En `/auth`, el `click()` de Playwright sobre las pestañas no llega a React, aunque la página esté hidratada. `dispatchEvent('click')` sí funciona. Antes de interactuar hay que esperar a que el botón tenga `__reactProps…`, porque si no el formulario se envía de forma nativa y la página se recarga.
+- Para probar "Salir" en Playwright, no alcanza con esperar la URL `/`: si la página ya estaba en `/`, esa condición se cumple antes de que termine la salida. Hay que esperar a que aparezca el enlace "Iniciar Sesión" (`a.auth-btn`).
 - Para probar validaciones de email, usar algo como `a@b`. Con `no-es-email`, el `type="email"` del navegador frena el envío y la Server Action nunca se ejecuta.

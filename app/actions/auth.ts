@@ -3,7 +3,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { safeNext, translateAuthError } from "@/lib/auth-errors";
+import { INVALID_CREDENTIALS, safeNext, translateAuthError } from "@/lib/auth-errors";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AuthFormState =
   { error: string } | { notice: "check-email" | "reset-sent" } | undefined;
@@ -75,11 +76,24 @@ export async function signIn(
   _prevState: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
-  const email = (formData.get("email") as string | null)?.trim();
+  const identifier = (formData.get("identifier") as string | null)?.trim();
   const password = formData.get("password") as string | null;
 
-  if (!email || !password) {
-    return { error: "Completa correo y contraseña." };
+  if (!identifier || !password) {
+    return { error: "Completa usuario o correo, y contraseña." };
+  }
+
+  let email = identifier;
+  if (!identifier.includes("@")) {
+    // Usuario → email con la secret key: email_for_username solo la ejecuta service_role.
+    const { data } = await createAdminClient().rpc("email_for_username", {
+      p_username: identifier,
+    });
+    if (!data) {
+      // Mismo mensaje que una contraseña incorrecta: no revela qué usuarios existen.
+      return { error: INVALID_CREDENTIALS };
+    }
+    email = data as string;
   }
 
   const supabase = await createClient();

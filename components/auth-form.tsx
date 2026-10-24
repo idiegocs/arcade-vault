@@ -96,13 +96,14 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
               </div>
             )}
             <div className="field">
-              <label>Correo electrónico</label>
+              <label>{tab === "in" ? "Usuario o correo" : "Correo electrónico"}</label>
               <input
-                name="email"
-                type="email"
+                name={tab === "in" ? "identifier" : "email"}
+                type={tab === "in" ? "text" : "email"}
+                autoComplete={tab === "in" ? "username" : "email"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="jugador@vault.gg"
+                placeholder={tab === "in" ? "px_kai o jugador@vault.gg" : "jugador@vault.gg"}
                 disabled={pending}
               />
             </div>
