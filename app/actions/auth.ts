@@ -3,7 +3,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { INVALID_CREDENTIALS, LINK_EXPIRED, safeNext, translateAuthError } from "@/lib/auth-errors";
+import {
+  AUTH_UNAVAILABLE,
+  INVALID_CREDENTIALS,
+  LINK_EXPIRED,
+  safeNext,
+  translateAuthError,
+} from "@/lib/auth-errors";
 import { isRecoverySession } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -87,9 +93,19 @@ export async function signIn(
   let email = identifier;
   if (!identifier.includes("@")) {
     // Usuario → email con la secret key: email_for_username solo la ejecuta service_role.
-    const { data } = await createAdminClient().rpc("email_for_username", {
-      p_username: identifier,
-    });
+    let data: unknown = null;
+    try {
+      const result = await createAdminClient().rpc("email_for_username", {
+        p_username: identifier,
+      });
+      if (result.error) throw result.error;
+      data = result.data;
+    } catch (lookupError) {
+      // Falta SUPABASE_SECRET_KEY, la clave es inválida o no está la migración 005:
+      // es un problema de configuración, no del jugador. Se registra y se avisa genérico.
+      console.error("[auth] email_for_username falló:", lookupError);
+      return { error: AUTH_UNAVAILABLE };
+    }
     if (!data) {
       // Mismo mensaje que una contraseña incorrecta: no revela qué usuarios existen.
       return { error: INVALID_CREDENTIALS };

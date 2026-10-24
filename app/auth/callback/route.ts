@@ -12,6 +12,12 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
 
+  // Supabase vuelve con ?error=… (sin code) si el jugador canceló en Google/GitHub,
+  // el proveedor está apagado o rechazó el ingreso: no es un enlace vencido.
+  if (searchParams.has("error")) {
+    return NextResponse.redirect(new URL("/auth?error=proveedor", origin));
+  }
+
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);

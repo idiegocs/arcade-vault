@@ -22,6 +22,9 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
   // un error en vez de lanzar), así que el valor tiene que vivir en React,
   // no en el DOM, para sobrevivir a un intento fallido.
   const [username, setUsername] = useState("");
+  // Separados: lo que se escribe para entrar (usuario o correo) no se arrastra
+  // al campo de correo de CREAR CUENTA, que exige formato de email.
+  const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -32,7 +35,21 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
   const touched = signInState !== undefined || signUpState !== undefined;
   const error =
     state && "error" in state ? state.error : touched ? undefined : (linkError ?? undefined);
-  const checkEmail = tab === "up" && state && "notice" in state && state.notice === "check-email";
+  // El aviso "REVISA TU CORREO" se oculta al cambiar de pestaña, para poder
+  // corregir el correo y registrarse de nuevo sin recargar.
+  const [dismissedNotice, setDismissedNotice] = useState<typeof signUpState>(undefined);
+  const checkEmail =
+    tab === "up" &&
+    signUpState !== dismissedNotice &&
+    state &&
+    "notice" in state &&
+    state.notice === "check-email";
+
+  const switchTab = (next: "in" | "up") => {
+    setTab(next);
+    setForgot(false);
+    setDismissedNotice(signUpState);
+  };
   const shake = Boolean(error) && !pending;
 
   return (
@@ -58,20 +75,14 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
           <button
             type="button"
             className={tab === "in" ? "on" : ""}
-            onClick={() => {
-              setTab("in");
-              setForgot(false);
-            }}
+            onClick={() => switchTab("in")}
           >
             INICIAR SESIÓN
           </button>
           <button
             type="button"
             className={tab === "up" ? "on" : ""}
-            onClick={() => {
-              setTab("up");
-              setForgot(false);
-            }}
+            onClick={() => switchTab("up")}
           >
             CREAR CUENTA
           </button>
@@ -79,7 +90,7 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
 
         {tab === "in" && forgot ? (
           <ForgotPassword
-            email={email.includes("@") ? email : ""}
+            email={identifier.includes("@") ? identifier : ""}
             onBack={() => setForgot(false)}
           />
         ) : checkEmail ? (
@@ -123,8 +134,8 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
                 name={tab === "in" ? "identifier" : "email"}
                 type={tab === "in" ? "text" : "email"}
                 autoComplete={tab === "in" ? "username" : "email"}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={tab === "in" ? identifier : email}
+                onChange={(e) => (tab === "in" ? setIdentifier : setEmail)(e.target.value)}
                 placeholder={tab === "in" ? "px_kai o jugador@vault.gg" : "jugador@vault.gg"}
                 disabled={pending}
               />

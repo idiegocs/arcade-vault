@@ -9,7 +9,7 @@ export const LINK_EXPIRED = "El enlace expiró. Pide uno nuevo.";
 
 export const PROVIDER_UNAVAILABLE = "Proveedor no disponible. Prueba con otro método.";
 
-const GENERIC_ERROR = "Algo salió mal. Intenta de nuevo en unos segundos.";
+export const AUTH_UNAVAILABLE = "Algo salió mal. Intenta de nuevo en unos segundos.";
 
 // Fragmentos (en minúsculas) de los mensajes de Supabase → texto en español.
 // El orden importa: gana el primero que aparece en el mensaje.
@@ -36,7 +36,7 @@ const TRANSLATIONS: [string, string][] = [
 export function translateAuthError(message: string): string {
   const lower = message.toLowerCase();
   const match = TRANSLATIONS.find(([fragment]) => lower.includes(fragment));
-  return match ? match[1] : GENERIC_ERROR;
+  return match ? match[1] : AUTH_UNAVAILABLE;
 }
 
 // Origen ficticio para resolver `next` como lo haría el navegador.
