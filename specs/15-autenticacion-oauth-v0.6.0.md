@@ -1,6 +1,6 @@
 # SPEC 15 — Autenticación con Google, GitHub y usuario/contraseña
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** 04-supabase-auth-scores (cliente de Supabase, `profiles`, trigger `handle_new_user`, Server Actions de auth)
 > **Fecha:** 2026-10-24
 > **Versión:** 0.5.2 → 0.6.0 (minor: funcionalidad nueva visible para el usuario)
