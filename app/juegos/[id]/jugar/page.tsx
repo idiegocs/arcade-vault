@@ -1,17 +1,37 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getGameById } from "@/lib/games";
-import { getSessionUsername } from "@/lib/session";
+import { authRedirectPath } from "@/lib/auth-errors";
+import { getSessionPlayer } from "@/lib/session";
 import { GAME_ENGINES } from "@/components/games/registry";
 import { GamePlayerShell } from "@/components/games/game-player-shell";
 
-export default async function GamePlayerPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function GamePlayerPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { id } = await params;
-  const game = await getGameById(id);
+  const [player, game] = await Promise.all([getSessionPlayer(), getGameById(id)]);
+
+  // Jugar requiere cuenta (spec 16). El proxy ya redirige; esto es la segunda
+  // línea por si la regla del proxy falla o cambia. Solo sin sesión: con
+  // sesión y sin perfil se juega (sin guardar) en vez de rebotar entre /auth y /.
+  if (!player) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(await searchParams)) {
+      for (const v of [value ?? []].flat()) query.append(key, v);
+    }
+    const search = query.size ? `?${query}` : "";
+    redirect(authRedirectPath(`/juegos/${id}/jugar${search}`));
+  }
+
   if (!game) notFound();
+  const { username } = player;
 
   if (GAME_ENGINES[id]) {
-    const username = await getSessionUsername();
     return <GamePlayerShell gameId={game.id} gameTitle={game.title} username={username} />;
   }
 
@@ -22,7 +42,7 @@ export default async function GamePlayerPage({ params }: { params: Promise<{ id:
           <div className="hud-stat">
             <div className="l">Jugador</div>
             <div className="v" style={{ color: "var(--ink)" }}>
-              INVITADO
+              {username ? username.toUpperCase() : "INVITADO"}
             </div>
           </div>
           <div className="hud-stat">

@@ -7,9 +7,11 @@ import {
   AUTH_UNAVAILABLE,
   INVALID_CREDENTIALS,
   LINK_EXPIRED,
+  PWNED_PASSWORD,
   safeNext,
   translateAuthError,
 } from "@/lib/auth-errors";
+import { isPwnedPassword } from "@/lib/pwned-password";
 import { isRecoverySession } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -57,6 +59,11 @@ export async function signUp(
 
   if (taken) {
     return { error: "Ese usuario ya está en uso." };
+  }
+
+  // Última validación antes de Supabase: es la única que sale a la red (HIBP).
+  if (await isPwnedPassword(password)) {
+    return { error: PWNED_PASSWORD };
   }
 
   const next = safeNext(formData.get("next") as string | null);
@@ -163,10 +170,13 @@ export async function updatePassword(
   if (password !== confirm) {
     return { error: "Las contraseñas no coinciden." };
   }
-
   // La página ya lo exige, pero la Server Action se puede invocar sin pasar por ella.
+  // Va antes de HIBP: sin sesión de recuperación, el servidor no sale a la red.
   if (!(await isRecoverySession())) {
     return { error: LINK_EXPIRED };
+  }
+  if (await isPwnedPassword(password)) {
+    return { error: PWNED_PASSWORD };
   }
 
   const supabase = await createClient();

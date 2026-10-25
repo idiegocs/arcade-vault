@@ -1,42 +1,22 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { guardRoute } from "@/lib/proxy/route-guards";
+import { updateSession } from "@/lib/proxy/session";
 
 /**
- * Refresca la sesión de Supabase (cookies) en cada request.
- * Next.js 16 renombró middleware.ts a proxy.ts; la funcionalidad es la misma.
+ * Proxy de Next 16 (antes middleware.ts). Solo orquesta: la lógica vive en
+ * lib/proxy/ (un solo proxy.ts por proyecto, organizado en módulos).
  */
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  const { response, user } = await updateSession(request);
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const redirectTo = guardRoute(request, user);
+  if (!redirectTo) return response;
 
-  if (!url || !publishableKey) {
-    throw new Error(
-      "Faltan NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY en .env.local"
-    );
-  }
-
-  const supabase = createServerClient(url, publishableKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        supabaseResponse = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
-        );
-      },
-    },
-  });
-
-  // No agregar lógica entre createServerClient y getUser(): getUser() es lo que
-  // efectivamente refresca el token si está por expirar.
-  await supabase.auth.getUser();
-
-  return supabaseResponse;
+  // Las cookies que getUser() acaba de refrescar viajan en `response`: si el
+  // redirect no las lleva, el token nuevo se pierde y la sesión se cae.
+  const redirect = NextResponse.redirect(redirectTo);
+  response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
 }
 
 export const config = {

@@ -57,6 +57,9 @@ Si todo está ✅, pasá directo a la Fase 4 (igual hay que verificar en el nave
 ## Fase 4 — Verificar en el navegador (Playwright)
 
 1. Levantá el dev server si no está corriendo (`npm run dev` en background; comprobá `http://localhost:3000` antes de lanzarlo).
+   - **Login previo (spec 16: jugar requiere cuenta).** Sin sesión, `/juegos/<id>/jugar` redirige a `/auth`. Leé `E2E_USER_EMAIL` y `E2E_USER_PASSWORD` de `.env.local` (`grep -E '^E2E_USER_(EMAIL|PASSWORD)=' .env.local`). **Si falta alguna, terminá la corrida avisándolo**: el humano tiene que crear la cuenta de prueba y cargar las variables. No uses otra cuenta ni busques un bypass.
+   - Navegá a `/auth`, llená `input[name="identifier"]` con el email y `input[name="password"]` con la contraseña, y hacé clic en **ENTRAR AL VAULT**. Comprobá que la URL ya no es `/auth` y que el Nav muestra "Salir". La sesión vive en las cookies del contexto: si abrís un contexto nuevo (p. ej. para el desktop sin emulación), repetí el login.
+   - **Nunca** escribas la contraseña en el reporte, en screenshots con el formulario lleno ni en archivos del repo.
 2. **Emular táctil.** El gamepad aparece solo con `(pointer: coarse)`. Activalo por CDP con `browser_run_code_unsafe`, por ejemplo:
 
    ```js

@@ -6,6 +6,23 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.7.0] - 2026-10-25
+
+Spec: [`16-endurecimiento-seguridad-rutas-v0.7.0`](specs/16-endurecimiento-seguridad-rutas-v0.7.0.md)
+
+### Added
+
+- Headers de seguridad en todas las respuestas: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` y, en producción, `Strict-Transport-Security`.
+- Al registrarse o restablecer la contraseña, se rechazan las contraseñas que aparecen en filtraciones conocidas (HaveIBeenPwned). La contraseña nunca sale del servidor: solo se consulta un prefijo de su hash.
+- `references/security-checklist/politicas-rls.md`: inventario de las políticas RLS, las funciones `SECURITY DEFINER` y los grants de la base.
+
+### Changed
+
+- **Jugar requiere cuenta.** Sin sesión, abrir un juego lleva a iniciar sesión, y al entrar se vuelve al juego. El catálogo, las fichas de los juegos y el Salón de la Fama siguen siendo públicos.
+- JUGAR COMO INVITADO pasa a ser VER CATÁLOGO. La home y su FAQ dicen que para jugar hace falta una cuenta.
+- Los mensajes de contraseña filtrada y de contraseña sin minúsculas, mayúsculas o números se muestran en español.
+- Las políticas de la base que permiten guardar un puntaje y editar el propio perfil solo aplican a usuarios con sesión, y se evalúan una vez por consulta. Nuevo índice en `scores.user_id`.
+
 ## [0.6.0] - 2026-10-24
 
 Spec: [`15-autenticacion-oauth-v0.6.0`](specs/15-autenticacion-oauth-v0.6.0.md)

@@ -13,6 +13,7 @@ Arcade Vault — a platform for playing games online and competing on points/lea
 Key rules:
 
 - **[`references/juegos-implementados.md`](references/juegos-implementados.md)** is the source of truth for which games have a real engine. Update it whenever a game is added to/removed from `registry.ts` or the `games` table.
+- **RLS:** [`references/security-checklist/politicas-rls.md`](references/security-checklist/politicas-rls.md) is the inventory of RLS policies, `SECURITY DEFINER` functions and grants. Update it whenever a migration changes any of them.
 - **Score caps:** `saveScore` (`app/actions/scores.ts`) rejects scores above the game's `maxPlausibleScore` from its `registry.ts` entry; no entry ⇒ every score rejected (fail-closed, intentional — spec 11).
 - **Per-game, not platform:** sounds (`defineSounds` from `components/games/audio.ts`), background music (spec 13), skins `clasico`/`neon`/`retro` (CAÍDA is the reference) and `touchControls` (spec 12) all live in each game's engine/registry entry. Adding a game never touches `audio.ts` or `scores.ts`.
 - **Performance:** new engines follow the "Rendimiento" rules in `components/games/README.md` (spec 14: freeze after game over, cached background/glow, allocation-free `draw`). Dev-only FPS counter in the player; `@game-performance-booster` logs its runs in `references/rendimiento-juegos.md` (created on its first run).

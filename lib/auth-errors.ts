@@ -11,6 +11,8 @@ export const PROVIDER_UNAVAILABLE = "Proveedor no disponible. Prueba con otro m�
 
 export const AUTH_UNAVAILABLE = "Algo salió mal. Intenta de nuevo en unos segundos.";
 
+export const PWNED_PASSWORD = "Esa contraseña apareció en filtraciones conocidas. Elige otra.";
+
 // Fragmentos (en minúsculas) de los mensajes de Supabase → texto en español.
 // El orden importa: gana el primero que aparece en el mensaje.
 const TRANSLATIONS: [string, string][] = [
@@ -19,6 +21,15 @@ const TRANSLATIONS: [string, string][] = [
   ["user already registered", "Ese correo ya tiene una cuenta. Inicia sesión."],
   ["already been registered", "Ese correo ya tiene una cuenta. Inicia sesión."],
   ["password should be at least", "La contraseña debe tener al menos 8 caracteres."],
+  // Leaked password protection (HaveIBeenPwned): "Password is known to be weak
+  // and easy to guess…" — no contiene "weak password".
+  ["known to be weak", PWNED_PASSWORD],
+  // Refleja la regla del dashboard (Authentication → Providers → Email →
+  // Password requirements). Si se le agregan símbolos, actualizar este texto.
+  [
+    "should contain at least one character of each",
+    "La contraseña debe tener al menos una minúscula, una mayúscula y un número.",
+  ],
   ["weak password", "La contraseña es demasiado débil."],
   [
     "should be different from the old password",
@@ -37,6 +48,15 @@ export function translateAuthError(message: string): string {
   const lower = message.toLowerCase();
   const match = TRANSLATIONS.find(([fragment]) => lower.includes(fragment));
   return match ? match[1] : AUTH_UNAVAILABLE;
+}
+
+/**
+ * Ruta de /auth que, tras iniciar sesión, vuelve a `next` (ruta + query).
+ * La usan el proxy y la segunda línea de la página de juego, para que las dos
+ * capas armen el mismo destino.
+ */
+export function authRedirectPath(next: string): string {
+  return `/auth?next=${encodeURIComponent(safeNext(next))}`;
 }
 
 // Origen ficticio para resolver `next` como lo haría el navegador.
