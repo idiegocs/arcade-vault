@@ -1,6 +1,6 @@
 # SPEC 16 — Endurecimiento de seguridad y protección de rutas
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 
 > **Depende de:** 04-supabase-auth-scores (tablas `games`/`scores`/`profiles`, sus políticas RLS y `proxy.ts`), 15-autenticacion-oauth-v0.6.0 (`app/actions/auth.ts`, `lib/auth-errors.ts`, `safeNext`, botón JUGAR COMO INVITADO)
 > **Fecha:** 2026-10-25
@@ -167,61 +167,61 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
 
 **Base de datos (Supabase)**
 
-- [ ] `sql/007_endurecimiento_rls.sql` existe en el repo y aparece en `list_migrations`.
-- [ ] `relrowsecurity = true` en `games`, `scores` y `profiles`.
-- [ ] `"Users can insert their own scores"`: `roles = {authenticated}`, `with_check = ((SELECT auth.uid()) = user_id)`.
-- [ ] `"Users can update their own profile"`: `roles = {authenticated}`, `qual` y `with_check` = `((SELECT auth.uid()) = id)`.
-- [ ] Existe `scores_user_id_idx` sobre `scores(user_id)`.
-- [ ] `get_advisors` performance no reporta `auth_rls_initplan` ni `unindexed_foreign_keys`.
+- [x] `sql/007_endurecimiento_rls.sql` existe en el repo y aparece en `list_migrations`.
+- [x] `relrowsecurity = true` en `games`, `scores` y `profiles`.
+- [x] `"Users can insert their own scores"`: `roles = {authenticated}`, `with_check = ((SELECT auth.uid()) = user_id)`.
+- [x] `"Users can update their own profile"`: `roles = {authenticated}`, `qual` y `with_check` = `((SELECT auth.uid()) = id)`.
+- [x] Existe `scores_user_id_idx` sobre `scores(user_id)`.
+- [x] `get_advisors` performance no reporta `auth_rls_initplan` ni `unindexed_foreign_keys`.
 - [ ] ~~`get_advisors` seguridad no reporta `auth_leaked_password_protection`.~~ _No aplicable en plan Free (el toggle es de Pro): el warning sigue apareciendo y la protección la da `lib/pwned-password.ts`._
-- [ ] Con sesión, terminar una partida guarda el puntaje y aparece en el ranking.
+- [x] Con sesión, terminar una partida guarda el puntaje y aparece en el ranking.
 
 **Auth**
 
-- [ ] Registrarse con `Password123` muestra "Esa contraseña apareció en filtraciones conocidas. Elige otra." y no crea la cuenta.
-- [ ] Restablecer la contraseña con `Password123` en `/auth/restablecer` muestra el mismo mensaje y no la cambia.
-- [ ] Registrarse con una contraseña sin mayúsculas ni dígitos (no filtrada) muestra "La contraseña debe tener al menos una minúscula, una mayúscula y un número."
-- [ ] Con HIBP inaccesible, el registro sigue funcionando (fail-open) y queda un `console.warn` en el servidor.
-- [ ] Solo los 5 primeros caracteres del SHA-1 salen del servidor (revisión de `lib/pwned-password.ts`).
-- [ ] Registrarse con 7 caracteres muestra "La contraseña debe tener al menos 8 caracteres."
-- [ ] Login con Google, GitHub y usuario/contraseña siguen funcionando.
-- [ ] El spec documenta los valores configurados en el dashboard (contraseña mínima, leaked password protection, rate limit de signups).
+- [x] Registrarse con `Password123` muestra "Esa contraseña apareció en filtraciones conocidas. Elige otra." y no crea la cuenta.
+- [x] Restablecer la contraseña con `Password123` en `/auth/restablecer` muestra el mismo mensaje y no la cambia.
+- [x] Registrarse con una contraseña sin mayúsculas ni dígitos (no filtrada) muestra "La contraseña debe tener al menos una minúscula, una mayúscula y un número."
+- [x] Con HIBP inaccesible, el registro sigue funcionando (fail-open) y queda un `console.warn` en el servidor.
+- [x] Solo los 5 primeros caracteres del SHA-1 salen del servidor (revisión de `lib/pwned-password.ts`).
+- [x] Registrarse con 7 caracteres muestra "La contraseña debe tener al menos 8 caracteres."
+- [x] Login con Google, GitHub y usuario/contraseña siguen funcionando.
+- [x] El spec documenta los valores configurados en el dashboard (contraseña mínima, leaked password protection, rate limit de signups).
 
 **Proxy y rutas**
 
-- [ ] `proxy.ts` solo orquesta: el refresco de sesión vive en `lib/proxy/session.ts` y las reglas en `lib/proxy/route-guards.ts`.
-- [ ] El proxy no consulta tablas (solo `getUser()`).
-- [ ] Sin sesión, `/juegos/caida/jugar` redirige a `/auth?next=%2Fjuegos%2Fcaida%2Fjugar`; tras entrar se vuelve a `/juegos/caida/jugar`.
-- [ ] Sin sesión, `/`, `/games`, `/juegos/caida`, `/salon-de-la-fama` y `/about` responden 200 sin redirección.
-- [ ] Con sesión, `/auth` redirige a `/`.
-- [ ] Sin sesión de recuperación, `/auth/restablecer` redirige a `/auth`; el flujo "¿Olvidaste tu contraseña?" funciona de punta a punta.
-- [ ] `/auth?next=//evil.com` termina en `/` tras el login.
-- [ ] Con la regla del proxy desactivada temporalmente (prueba local, no commiteada), `app/juegos/[id]/jugar/page.tsx` igual redirige a `/auth` sin sesión.
-- [ ] Tras recargar con sesión, se sigue logueado (el refresco de cookies sigue funcionando).
+- [x] `proxy.ts` solo orquesta: el refresco de sesión vive en `lib/proxy/session.ts` y las reglas en `lib/proxy/route-guards.ts`.
+- [x] El proxy no consulta tablas (solo `getUser()`).
+- [x] Sin sesión, `/juegos/caida/jugar` redirige a `/auth?next=%2Fjuegos%2Fcaida%2Fjugar`; tras entrar se vuelve a `/juegos/caida/jugar`.
+- [x] Sin sesión, `/`, `/games`, `/juegos/caida`, `/salon-de-la-fama` y `/about` responden 200 sin redirección.
+- [x] Con sesión, `/auth` redirige a `/`.
+- [x] Sin sesión de recuperación, `/auth/restablecer` redirige a `/auth`; el flujo "¿Olvidaste tu contraseña?" funciona de punta a punta.
+- [x] `/auth?next=//evil.com` termina en `/` tras el login.
+- [x] Con la regla del proxy desactivada temporalmente (prueba local, no commiteada), `app/juegos/[id]/jugar/page.tsx` igual redirige a `/auth` sin sesión.
+- [x] Tras recargar con sesión, se sigue logueado (el refresco de cookies sigue funcionando).
 
 **Headers**
 
-- [ ] `curl -I` sobre `/`, `/auth` y `/juegos/caida/jugar` (incluido el 307 del redirect) devuelve los headers con los valores exactos del alcance: los 5 en producción (`next start`), 4 en dev (sin HSTS).
-- [ ] El juego carga y se juega por la IP de la LAN desde el celular.
+- [x] `curl -I` sobre `/`, `/auth` y `/juegos/caida/jugar` (incluido el 307 del redirect) devuelve los headers con los valores exactos del alcance: los 5 en producción (`next start`), 4 en dev (sin HSTS).
+- [x] El juego carga y se juega por la IP de la LAN desde el celular.
 
 **Textos**
 
-- [ ] `/auth` ya no muestra "JUGAR COMO INVITADO"; "VER CATÁLOGO" lleva a `/games`.
-- [ ] La FAQ "¿NECESITO CREAR CUENTA?" muestra el texto nuevo.
+- [x] `/auth` ya no muestra "JUGAR COMO INVITADO"; "VER CATÁLOGO" lleva a `/games`.
+- [x] La FAQ "¿NECESITO CREAR CUENTA?" muestra el texto nuevo.
 
 **Agentes**
 
-- [ ] `mobile-porter.md` y `game-performance-booster.md` describen el login previo con `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` y se detienen si faltan.
-- [ ] Con las variables en `.env.local`, un login vía Playwright MCP lleva a `/juegos/caida/jugar` y el canvas se renderiza.
-- [ ] Ninguna credencial en archivos trackeados (`git grep E2E_USER_PASSWORD=` sin resultados con valor).
+- [x] `mobile-porter.md` y `game-performance-booster.md` describen el login previo con `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` y se detienen si faltan.
+- [x] Con las variables en `.env.local`, un login vía Playwright MCP lleva a `/juegos/caida/jugar` y el canvas se renderiza.
+- [x] Ninguna credencial en archivos trackeados (`git grep E2E_USER_PASSWORD=` sin resultados con valor).
 
 **Documentación y cierre**
 
-- [ ] `politicas-rls.md` documenta las 5 políticas actuales y ninguna inexistente.
-- [ ] `CLAUDE.md` apunta a `politicas-rls.md` y sigue < ~8 KB.
-- [ ] `referenceSecurity.md` con todos los ítems en `[x]`; ambos archivos trackeados.
-- [ ] `package.json` = `0.7.0`, `CHANGELOG.md` con `[0.7.0]` y link al spec, Footer muestra `v0.7.0`.
-- [ ] `npm run lint` y `npm run build` terminan sin errores.
+- [x] `politicas-rls.md` documenta las 5 políticas actuales y ninguna inexistente.
+- [x] `CLAUDE.md` apunta a `politicas-rls.md` y sigue < ~8 KB.
+- [x] `referenceSecurity.md` con todos los ítems en `[x]`; ambos archivos trackeados.
+- [x] `package.json` = `0.7.0`, `CHANGELOG.md` con `[0.7.0]` y link al spec, Footer muestra `v0.7.0`.
+- [x] `npm run lint` y `npm run build` terminan sin errores.
 
 ## Decisiones tomadas y descartadas
 
