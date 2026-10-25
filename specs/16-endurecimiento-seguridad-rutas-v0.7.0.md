@@ -65,6 +65,7 @@ Políticas actuales (`pg_policies`): `games_select_public` (SELECT, `true`), `"P
   - FAQ "¿NECESITO CREAR CUENTA?" en `components/home-content.tsx`: _"Sí, para jugar necesitas una cuenta (es gratis y tarda 10 segundos). El catálogo y el Salón de la Fama son públicos."_
   - _(Agregado durante la implementación, 2026-10-25)_ Tagline final de la home (`home-content.tsx`): "Gratis. Sin registro obligatorio. Empieza en segundos." → "Gratis. Crea tu cuenta en segundos y empieza a jugar."
 - **Agentes con Playwright:** `@mobile-porter` y `@game-performance-booster` hacen login antes de abrir `/juegos/<id>/jugar`, con un usuario de prueba vía `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` en `.env.local` (nunca commiteadas). Sus `.md` lo documentan; si faltan las variables, se detienen y avisan. El usuario crea la cuenta de prueba.
+  - _(Agregado durante la implementación, 2026-10-25, decisión del usuario)_ El skill `/add-game-impl` (`.claude/skills/add-game-impl/SKILL.md`) también abre `/juegos/<id>/jugar` en su verificación end-to-end: pasa a loguearse con la cuenta de prueba y deja de describir el caso "invitado ve el CTA a `/auth`", que ya no es posible.
 - **Documentación de políticas:** `references/security-checklist/politicas-rls.md` — inventario por tabla (RLS activo, cada política con nombre/comando/roles/`USING`/`WITH CHECK` y qué permite en palabras simples, qué **no** se permite y por qué, funciones `SECURITY DEFINER` que saltan RLS — solo listadas —, migración que define cada política, fecha y query para regenerarlo). Una línea en "Key rules" de `CLAUDE.md`: todo cambio de políticas RLS se refleja ahí.
 - **Checklist:** `references/security-checklist/referenceSecurity.md` con todos los ítems en `[x]` y trackeado en git (hoy está sin trackear).
 - Bump a `0.7.0` en `package.json` y entrada en `CHANGELOG.md` ("Jugar requiere cuenta" bajo **Changed**).
@@ -146,7 +147,7 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
      - `/games`, `/juegos/caida`, `/salon-de-la-fama` abren sin sesión;
      - `next=//evil.com` termina en `/`.
 7. ✅ **Textos.** JUGAR COMO INVITADO → VER CATÁLOGO en `components/auth-form.tsx`; FAQ en `components/home-content.tsx`. Verificar en el navegador textos y enlace a `/games`.
-8. **Agentes con Playwright.**
+8. ✅ **Agentes con Playwright.**
    - En `.claude/agents/mobile-porter.md` y `.claude/agents/game-performance-booster.md`: paso de login previo (`/auth` → usuario y contraseña desde `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` de `.env.local`); sin variables, se detienen y avisan.
    - Documentar las variables en `.env.example` si existe; si no, en este spec.
    - Verificar con un login real vía Playwright MCP que `/juegos/caida/jugar` carga el canvas.
@@ -333,3 +334,24 @@ Ajustes de Supabase Auth informados por el usuario (dashboard → Authentication
 - `components/home-content.tsx`, FAQ "¿NECESITO CREAR CUENTA?": "Sí, para jugar necesitas una cuenta (es gratis y tarda 10 segundos). El catálogo y el Salón de la Fama son públicos."
 - **Verificación (Playwright):** en `/auth`, "VER CATÁLOGO" → `href="/games"` y no queda "JUGAR COMO INVITADO"; el HTML de `/` trae la FAQ nueva y no la vieja.
 - **Barrido de textos:** `grep` de "invitado / sin cuenta / sin registro" en `app`, `components`, `lib`, README y `juegos-implementados.md`. Quedan el "INVITADO" del HUD mock y del player (fallback defensivo, decidido en el spec) y el tagline de la home `home-content.tsx:452` "Gratis. Sin registro obligatorio. Empieza en segundos.", que ya no es cierto y no estaba en el alcance → **cambiado a "Gratis. Crea tu cuenta en segundos y empieza a jugar."** (decisión del usuario, 2026-10-25).
+
+### Paso 8 — Agentes con Playwright (2026-10-25)
+
+- **Variables de entorno** (no hay `.env.example` en el repo, se documentan acá). En `.env.local`, que está gitignored:
+
+  ```
+  # Cuenta de prueba sin privilegios para los agentes que abren /juegos/<id>/jugar (spec 16)
+  E2E_USER_EMAIL=<correo de la cuenta de prueba>
+  E2E_USER_PASSWORD=<contraseña: ≥ 8, minúsculas + mayúsculas + dígitos, no filtrada>
+  ```
+
+  La cuenta se crea como cualquier jugador desde `/auth` → CREAR CUENTA (p. ej. usuario `e2e_bot`).
+- `.claude/agents/mobile-porter.md`, Fase 4 paso 1: login previo con el formulario de `/auth` (`input[name="identifier"]`, `input[name="password"]`, ENTRAR AL VAULT), comprobar que la URL ya no es `/auth`, repetir el login en contextos nuevos. Sin las variables, la corrida termina avisando. Nunca escribir la contraseña en el reporte, en screenshots con el formulario lleno ni en el repo.
+- `.claude/agents/game-performance-booster.md`, Fase 3: chequeo de las 2 variables en el paso 1, y en el ajuste del script de S1 un login entre `newPage` y el primer `goto`, con las credenciales leídas de `.env.local` **dentro del script** (no por argv ni impresas), y abortar si un `goto` termina en `/auth`. Para el Playwright MCP, mismo login que `mobile-porter`.
+- `skin-designer.md` solo menciona `/juegos/<id>/jugar` como prueba manual del humano: no cambia. `game-planner.md` y `game-jam.md` no abren el juego.
+- **Verificación:** script Node con el Playwright del caché de npx (como el de `@game-performance-booster`), que lee `E2E_USER_*` de `.env.local` sin imprimirlas: `/juegos/caida/jugar` → `/auth?next=%2Fjuegos%2Fcaida%2Fjugar` → login con `e2e_bot` → `/juegos/caida/jugar` con 1 canvas y "Salir" en el Nav. `E2E_USER_EMAIL` acepta usuario o correo (el login resuelve el usuario con `email_for_username`).
+- **Incidentes durante la verificación:**
+  - La contraseña cargada en `.env.local` no era la de la cuenta (`invalid_credentials` en `auth_logs`). Como un hash bcrypt no se puede revertir, se generó una nueva (20 caracteres, minúsculas + mayúsculas + dígitos, chequeada contra HIBP) y se asignó con `auth.admin.updateUserById` usando `SUPABASE_SECRET_KEY`; el script reemplazó solo la línea `E2E_USER_PASSWORD=` (respaldo en `.env.local.bak`, también ignorado por `.env*`). Decisión del usuario.
+  - El primer intento usó `browser_run_code_unsafe` del Playwright MCP con las credenciales inyectadas en el código: **el MCP imprime el código ejecutado**, así que la contraseña anterior quedó en el transcript. Quedó sin valor al rotarla. `require` no existe en ese contexto y `filename` solo acepta archivos dentro del repo.
+- **Lección:** con el Playwright MCP no hay forma de usar un secreto sin que aparezca en la salida (`browser_fill_form`/`run_code` lo muestran). Para logins con credenciales reales, usar un script Node propio que lea `.env.local` (como el de `@game-performance-booster`); con el MCP, asumir que la contraseña de prueba queda en el transcript y que es una cuenta sin privilegios.
+- `.claude/skills/add-game-impl/SKILL.md` _(agregado al alcance, decisión del usuario)_: en el paso 5 del plan, el test manual se hace con sesión iniciada; en la verificación end-to-end, el nuevo punto 2 es el login con `E2E_USER_*` (mismo procedimiento que `mobile-porter`, sin bypass, con el aviso de que el MCP muestra lo que se escribe), y el 3 une la prueba del HUD con el guardado del puntaje (ya no existe el caso invitado). Los demás skills (`add-game`, `spec-impl-game`, `game-jam`) no abren el juego en el navegador.

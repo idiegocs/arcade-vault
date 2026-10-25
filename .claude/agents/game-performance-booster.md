@@ -69,10 +69,13 @@ En "Costo estimado" poné alto, medio o bajo, según la lección 3: el glow y el
 ## Fase 3 — Línea base (headless)
 
 1. **Dev server:** comprobá `http://localhost:3000` antes de lanzarlo. Si no responde, corré `npm run dev` en background. Hace falta dev porque el script espera `[data-fps-meter]`, que solo existe en dev.
+   - **Cuenta de prueba (spec 16: jugar requiere cuenta).** Sin sesión, `/juegos/<id>/jugar` redirige a `/auth` y el script nunca ve el `[data-fps-meter]`. Comprobá que `.env.local` tenga `E2E_USER_EMAIL` y `E2E_USER_PASSWORD` (`grep -cE '^E2E_USER_(EMAIL|PASSWORD)=' .env.local` tiene que dar 2). **Si falta alguna, terminá la corrida avisándolo**: el humano crea la cuenta y carga las variables. No uses otra cuenta ni busques un bypass.
 2. **Script:** copiá el de la bitácora S1 del spec 14 a un directorio temporal **fuera del repo** (ej. `$TEMP/game-performance-booster/measure.cjs`). Después ajustá tres cosas:
    - **Ruta de Playwright:** buscá en el caché de npx (`ls ~/AppData/Local/npm-cache/_npx/*/node_modules/playwright`) y usá la primera que cargue con `require`. No instales nada en el repo.
    - **Skins:** usá las de la entrada del registry, no las 3 fijas del script.
    - **Teclas del bot:** usá el inventario real de teclas del motor (las que lee durante la partida, incluyendo empezar y relanzar). El bot de RANARIA manda flechas y Espacio; un juego que use otras teclas necesita las suyas, si no la medición queda con el juego quieto.
+   - **Login:** el script de S1 es anterior al spec 16. Agregale un login justo después de `browser.newPage(...)` y antes del primer `goto` a `/juegos/...`: leé `E2E_USER_EMAIL`/`E2E_USER_PASSWORD` parseando `.env.local` con `fs` dentro del propio script (no las pases por la línea de comandos ni las imprimas), `page.goto("http://localhost:3000/auth")`, `page.fill('input[name="identifier"]', email)`, `page.fill('input[name="password"]', password)`, clic en `text=ENTRAR AL VAULT` y `page.waitForURL((u) => !u.pathname.startsWith("/auth"))`. La sesión queda en las cookies de esa página para todo el loop. Si después de un `goto` la URL termina en `/auth`, abortá con un error claro en vez de medir.
+   - Para la verificación táctil de la Fase 5 y cualquier chequeo con el Playwright MCP, hacé el mismo login en el navegador del MCP (ver Fase 4 de `mobile-porter.md`). Nunca escribas la contraseña en el reporte ni en archivos del repo.
 3. **Corridas:** 30 s por skin, siempre con `HEADLESS=1` (gotcha de S1: una ventana tapada frena el rAF). Son dos corridas:
    - con GPU: CPU 1x y 4x;
    - con `NOGPU=1`: CPU 1x y 4x.

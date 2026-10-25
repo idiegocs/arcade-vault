@@ -128,8 +128,8 @@ que cualquier score se pueda guardar (FK `scores_game_id_fkey`):
    todavía no esté conectado al registry.
 5. Entrada en `components/games/registry.ts` — `load` con `import()`
    dinámico (nunca un import estático arriba del archivo) y
-   `maxPlausibleScore` con el techo que fija el spec. Test manual: entrar a
-   `/juegos/<id>/jugar` y confirmar que aparece el motor real (no el mock
+   `maxPlausibleScore` con el techo que fija el spec. Test manual: con sesión
+   iniciada (jugar requiere cuenta), entrar a `/juegos/<id>/jugar` y confirmar que aparece el motor real (no el mock
    hardcodeado de score `12450`).
 6. Bump de `package.json` + entrada en `CHANGELOG.md` (Keep a Changelog,
    es-ES, enlazando a este spec) — **agregar esto aunque el paso del plan no
@@ -166,15 +166,20 @@ Antes de dar el spec por terminado, confirmar en orden:
 
 1. `npm run lint` y `npm run build` sin errores (el build corre TypeScript
    — cualquier tipo mal cerrado en el motor lo revienta acá).
-2. Con Playwright (`mcp__playwright__browser_navigate` +
-   `browser_snapshot`/`browser_take_screenshot`): entrar a
+2. **Jugar requiere sesión (spec 16):** sin sesión, `/juegos/<id>/jugar`
+   redirige a `/auth?next=…`. Antes de entrar, loguearse con la cuenta de
+   prueba: `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` de `.env.local` (si faltan,
+   parar y pedírselas al humano; no usar otra cuenta ni un bypass), con el
+   mismo login que la Fase 4 de `.claude/agents/mobile-porter.md`. Ojo: el
+   Playwright MCP muestra en su salida lo que se escribe en los campos — no
+   repetir la contraseña en el reporte.
+3. Con Playwright (`mcp__playwright__browser_navigate` +
+   `browser_snapshot`/`browser_take_screenshot`), ya logueado: entrar a
    `/juegos/<id>/jugar`, confirmar que el HUD muestra valores reales del
-   motor (no el mock), que PAUSA congela la partida y REANUDAR la retoma sin
-   saltos, y que FIN abre el modal de fin de partida con el score actual.
-3. **Guardar un puntaje requiere sesión activa** — un invitado ve el CTA a
-   `/auth` en el modal y no se guarda nada; eso es esperado, no un bug. Para
-   probar el guardado hace falta loguearse primero (`/auth`). Con sesión:
-   jugar hasta game over, confirmar el toast `▸ PUNTUACIÓN GUARDADA_`.
+   motor (no el mock) y el usuario (no INVITADO), que PAUSA congela la
+   partida y REANUDAR la retoma sin saltos, y que FIN abre el modal de fin
+   de partida con el score actual. Jugar hasta game over y confirmar el
+   toast `▸ PUNTUACIÓN GUARDADA_`.
 4. Confirmar con el MCP de Supabase que se creó **exactamente una** fila
    nueva: `select count(*) from scores where game_id = '<id>'` antes y
    después de la partida.
