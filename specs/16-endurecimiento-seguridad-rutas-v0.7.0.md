@@ -128,10 +128,10 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
    - En `lib/auth-errors.ts`, agregar `["known to be weak", PWNED_PASSWORD]` **antes** de `"weak password"`, y la traducción de la regla de composición.
    - `lib/pwned-password.ts` + llamada en `signUp` y `updatePassword`.
    - Verificar: `Password123` → mensaje de filtrada sin crear cuenta; una contraseña sin mayúsculas → mensaje de composición; contraseña aleatoria → no filtrada; HIBP caído → fail-open.
-4. **Verificación de la configuración del dashboard.**
+4. ✅ **Verificación de la configuración del dashboard.**
    - `get_advisors` seguridad: `auth_leaked_password_protection` **sigue apareciendo** (esperado en Free; cubierto por el chequeo de la app).
    - Documentar en este spec los valores configurados (contraseña mínima, leaked password protection, rate limit de signups).
-5. **Proxy en módulos (sin cambio de comportamiento).**
+5. ✅ **Proxy en módulos (sin cambio de comportamiento).**
    - Leer antes `01-getting-started/16-proxy.md`, `03-api-reference/03-file-conventions/proxy.md` y _Optimistic checks with Proxy_ de `02-guides/authentication.md`.
    - Mover el refresco de sesión a `lib/proxy/session.ts` (`updateSession(request) → { response, user }`); `proxy.ts` solo lo llama. `matcher` igual.
    - Verificar login, logout, guardado de puntaje y que al recargar se sigue logueado.
@@ -296,3 +296,21 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
   - `auth.users` sin cuentas `spec16%` al terminar.
 - **Pendiente para los criterios:** restablecer con `Password123` en `/auth/restablecer` requiere una sesión de recuperación (enlace por correo); se prueba a mano en la verificación final.
 - **Lección:** antes de dar por buena una config del dashboard, probarla con un caso que la ejercite y mirar `auth_logs` — el mensaje genérico de la app ocultaba que la contraseña ni siquiera llegaba al chequeo esperado.
+
+### Paso 4 — Configuración del dashboard (2026-10-25)
+
+Ajustes de Supabase Auth informados por el usuario (dashboard → Authentication), con lo que se pudo comprobar desde fuera (el MCP no expone la config de Auth):
+
+| Ajuste | Dónde | Valor | Comprobado |
+|---|---|---|---|
+| Contraseña mínima | Authentication → Providers → Email → _Minimum password length_ | 8 | Solo indirectamente: la app corta antes en 8 (`MIN_PASSWORD`). |
+| Requisitos de composición | Authentication → Providers → Email → _Password requirements_ | minúsculas, mayúsculas y dígitos | ✅ `auth_logs`: `422 Password should contain at least one character of each…` |
+| Leaked password protection | Authentication → Providers → Email → _Prevent use of leaked passwords_ | **No disponible (plan Free)** | ✅ `Password123` se aceptaba; advisor `auth_leaked_password_protection` sigue en WARN. Cubierto en la app (paso 3). |
+| Rate limit de signups/sign-ins por IP | Authentication → Rate Limits | **10** solicitudes por IP (ventana de 5 min de Supabase), informado por el usuario | — (no se dispara a propósito para no bloquear la IP de desarrollo) |
+
+### Paso 5 — Proxy en módulos (2026-10-25)
+
+- Se leyeron `01-getting-started/16-proxy.md`, `03-api-reference/03-file-conventions/proxy.md` y _Optimistic checks with Proxy_ (`02-guides/authentication.md`). Nota de la API reference: el proxy no debe depender de **estado** compartido o globals; importar funciones de módulos (lo que hace este spec) sí está recomendado por la guía.
+- `lib/proxy/session.ts`: `updateSession(request) → { response, user }`. Es el código del spec 04 movido tal cual (mismo `setAll` que recrea `NextResponse.next({ request })`), solo que ahora devuelve el `user` del `getUser()` que ya se hacía.
+- `proxy.ts`: solo `const { response } = await updateSession(request); return response;`. Mismo `matcher` y misma exportación nombrada `proxy`.
+- **Verificación:** `tsc --noEmit` OK. Playwright: login con ▣ GITHUB → `/`; `/games` con sesión; `/juegos/caida/jugar` muestra `IDIEGOCS` (no INVITADO) y el canvas; Salir → `/` con "Iniciar Sesión". El guardado de puntaje se cubrió a nivel RLS en el paso 1 (INSERT como `authenticated`); jugar una partida completa queda para la verificación final.
