@@ -152,7 +152,7 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
    - Documentar las variables en `.env.example` si existe; si no, en este spec.
    - Verificar con un login real vía Playwright MCP que `/juegos/caida/jugar` carga el canvas.
    - Los `.md` están force-added: `git add -f`.
-9. **Documentar las políticas.**
+9. ✅ **Documentar las políticas.**
    - Generar el inventario desde la base (`pg_policies` + `pg_class.relrowsecurity`), ya con la 007 aplicada, y escribir `references/security-checklist/politicas-rls.md` con la estructura del alcance.
    - Línea en "Key rules" de `CLAUDE.md`.
    - Verificar que cada política de `pg_policies` aparece documentada y que no hay ninguna documentada que no exista.
@@ -355,3 +355,13 @@ Ajustes de Supabase Auth informados por el usuario (dashboard → Authentication
   - El primer intento usó `browser_run_code_unsafe` del Playwright MCP con las credenciales inyectadas en el código: **el MCP imprime el código ejecutado**, así que la contraseña anterior quedó en el transcript. Quedó sin valor al rotarla. `require` no existe en ese contexto y `filename` solo acepta archivos dentro del repo.
 - **Lección:** con el Playwright MCP no hay forma de usar un secreto sin que aparezca en la salida (`browser_fill_form`/`run_code` lo muestran). Para logins con credenciales reales, usar un script Node propio que lea `.env.local` (como el de `@game-performance-booster`); con el MCP, asumir que la contraseña de prueba queda en el transcript y que es una cuenta sin privilegios.
 - `.claude/skills/add-game-impl/SKILL.md` _(agregado al alcance, decisión del usuario)_: en el paso 5 del plan, el test manual se hace con sesión iniciada; en la verificación end-to-end, el nuevo punto 2 es el login con `E2E_USER_*` (mismo procedimiento que `mobile-porter`, sin bypass, con el aviso de que el MCP muestra lo que se escribe), y el 3 une la prueba del HUD con el guardado del puntaje (ya no existe el caso invitado). Los demás skills (`add-game`, `spec-impl-game`, `game-jam`) no abren el juego en el navegador.
+
+### Paso 9 — Documentar las políticas (2026-10-25)
+
+- Inventario generado con una sola query desde la base (políticas, `relrowsecurity`/`relforcerowsecurity`, funciones `SECURITY DEFINER` con sus `EXECUTE`, trigger y grants de `anon`/`authenticated`), y cruzado con `grep` de `sql/*.sql` para la columna "Definida en".
+- `references/security-checklist/politicas-rls.md`: resumen por tabla, una tabla por tabla de la base (política, comando, roles, `USING`, `WITH CHECK`, migración), qué permite y qué **no**, las 2 funciones `SECURITY DEFINER`, grants y las queries para regenerarlo.
+- `CLAUDE.md`, "Key rules": una línea que apunta al inventario y pide actualizarlo con cada migración que toque políticas, funciones `SECURITY DEFINER` o grants. `CLAUDE.md` queda en 6,3 KB (< 8 KB).
+- **Verificación:** las 5 políticas de `pg_policies` aparecen una vez cada una en las tablas del documento, con su comando; no hay políticas documentadas que no existan.
+- **Hallazgos documentados (fuera de alcance, para specs futuros):**
+  - `anon` y `authenticated` tienen todos los grants por defecto de Supabase en las 3 tablas (incluido `TRUNCATE`, que RLS no cubre; PostgREST no lo expone). → auditoría de grants.
+  - La UPDATE de `profiles` no limita columnas: un usuario con sesión puede cambiar su `username` por la API sin la validación de formato de `signUp` (lo frenan `UNIQUE` y `profiles_username_lower_key`, no el regex). → spec de "cambiar usuario" o un `CHECK` en la base.
