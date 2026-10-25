@@ -38,6 +38,8 @@ Use these instead of ad-hoc game work. Each file holds the full instructions.
 - [`@mobile-porter <id>`](.claude/agents/mobile-porter.md) — makes a game playable on phones per spec 12 (input audit, `touchControls`, Playwright touch check).
 - [`@game-performance-booster <id|nombre>`](.claude/agents/game-performance-booster.md) — measures and fixes an engine's performance per spec 14; reports before→after. **Uses git** (`git stash`, `git checkout -- <motor>` to revert a failed fix) — commit engine work before running it.
 
+- [`@security-guardian [diff|<rama>]`](.claude/agents/security-guardian.md) — audits security against specs 15/16, `referenceSecurity.md` and `politicas-rls.md` (code, live Supabase, dev server). Audit-only, never fixes; writes its report to `references/security-checklist/auditorias/`.
+
 None of the agents bump versions or commit. `.claude/` is gitignored (since 2026-09-20), but the items above and `hooks/format-on-write.ps1` are force-added (`git add -f`) and tracked — force-add any new one too.
 
 ## Stack
