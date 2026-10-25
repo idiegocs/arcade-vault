@@ -1,6 +1,7 @@
 ## Checklist de seguridad básico
 
 > Implementado en el spec [16](../../specs/16-endurecimiento-seguridad-rutas-v0.7.0.md) (v0.7.0, 2026-10-25). Inventario de políticas: [`politicas-rls.md`](politicas-rls.md).
+> Auditoría periódica: [`@security-guardian`](../../.claude/agents/security-guardian.md) (completo o `diff`), solo reporta; reportes en [`auditorias/`](auditorias/).
 
 - [x] RLS: Row Level Security habilitado en ambas tablas: `games` y `scores` — también en `profiles`. Políticas de escritura con `(select auth.uid())` y rol `authenticated` (`sql/007_endurecimiento_rls.sql`).
 - [x] Minimum password length — mínimo 8 caracteres (Supabase Auth + `MIN_PASSWORD` en `app/actions/auth.ts`). Además, Supabase exige minúsculas, mayúsculas y dígitos.
