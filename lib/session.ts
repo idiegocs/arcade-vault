@@ -86,12 +86,16 @@ export async function isRecoverySession(): Promise<boolean> {
   return amr.some((entry) => entry.method === "recovery");
 }
 
-/** Username del usuario con sesión activa, o null si no hay sesión. */
-export async function getSessionUsername(): Promise<string | null> {
+/**
+ * Jugador de la sesión activa, o null si no hay sesión. `username` puede ser
+ * null con sesión (perfil faltante): quien lo usa distingue "sin sesión" de
+ * "sin perfil" para no mandar a /auth a alguien que ya entró.
+ */
+export async function getSessionPlayer(): Promise<{ username: string | null } | null> {
   // Sin el método de ingreso: quien lo usa (la página de juego) no lo necesita.
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user ? profileUsername(supabase, user.id) : null;
+  return user ? { username: await profileUsername(supabase, user.id) } : null;
 }

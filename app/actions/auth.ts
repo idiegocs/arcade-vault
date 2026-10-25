@@ -48,9 +48,6 @@ export async function signUp(
   if (password.length < MIN_PASSWORD) {
     return { error: `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.` };
   }
-  if (await isPwnedPassword(password)) {
-    return { error: PWNED_PASSWORD };
-  }
 
   const supabase = await createClient();
 
@@ -62,6 +59,11 @@ export async function signUp(
 
   if (taken) {
     return { error: "Ese usuario ya está en uso." };
+  }
+
+  // Última validación antes de Supabase: es la única que sale a la red (HIBP).
+  if (await isPwnedPassword(password)) {
+    return { error: PWNED_PASSWORD };
   }
 
   const next = safeNext(formData.get("next") as string | null);
@@ -168,13 +170,13 @@ export async function updatePassword(
   if (password !== confirm) {
     return { error: "Las contraseñas no coinciden." };
   }
-  if (await isPwnedPassword(password)) {
-    return { error: PWNED_PASSWORD };
-  }
-
   // La página ya lo exige, pero la Server Action se puede invocar sin pasar por ella.
+  // Va antes de HIBP: sin sesión de recuperación, el servidor no sale a la red.
   if (!(await isRecoverySession())) {
     return { error: LINK_EXPIRED };
+  }
+  if (await isPwnedPassword(password)) {
+    return { error: PWNED_PASSWORD };
   }
 
   const supabase = await createClient();

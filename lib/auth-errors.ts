@@ -24,6 +24,8 @@ const TRANSLATIONS: [string, string][] = [
   // Leaked password protection (HaveIBeenPwned): "Password is known to be weak
   // and easy to guess…" — no contiene "weak password".
   ["known to be weak", PWNED_PASSWORD],
+  // Refleja la regla del dashboard (Authentication → Providers → Email →
+  // Password requirements). Si se le agregan símbolos, actualizar este texto.
   [
     "should contain at least one character of each",
     "La contraseña debe tener al menos una minúscula, una mayúscula y un número.",
@@ -46,6 +48,15 @@ export function translateAuthError(message: string): string {
   const lower = message.toLowerCase();
   const match = TRANSLATIONS.find(([fragment]) => lower.includes(fragment));
   return match ? match[1] : AUTH_UNAVAILABLE;
+}
+
+/**
+ * Ruta de /auth que, tras iniciar sesión, vuelve a `next` (ruta + query).
+ * La usan el proxy y la segunda línea de la página de juego, para que las dos
+ * capas armen el mismo destino.
+ */
+export function authRedirectPath(next: string): string {
+  return `/auth?next=${encodeURIComponent(safeNext(next))}`;
 }
 
 // Origen ficticio para resolver `next` como lo haría el navegador.

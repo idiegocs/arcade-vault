@@ -41,7 +41,7 @@ Políticas actuales (`pg_policies`): `games_select_public` (SELECT, `true`), `"P
   - `X-Frame-Options: DENY`
   - `Referrer-Policy: strict-origin-when-cross-origin`
   - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-  - `Strict-Transport-Security: max-age=63072000; includeSubDomains` (sin `preload`)
+  - `Strict-Transport-Security: max-age=63072000; includeSubDomains` (sin `preload`; **solo en producción** — ajuste del code review)
 - **Configuración de Supabase Auth (dashboard) — aplicada por el usuario el 2026-10-25.** Se documenta en este spec (ruta del dashboard y valores) y se verifica:
   - Contraseña mínima de 8 caracteres.
   - ~~Leaked password protection (HaveIBeenPwned) activada.~~ _(Ajuste durante la implementación, 2026-10-25: el toggle es solo del plan Pro y el proyecto está en Free → se cubre en la app, ver abajo.)_
@@ -156,7 +156,7 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
    - Generar el inventario desde la base (`pg_policies` + `pg_class.relrowsecurity`), ya con la 007 aplicada, y escribir `references/security-checklist/politicas-rls.md` con la estructura del alcance.
    - Línea en "Key rules" de `CLAUDE.md`.
    - Verificar que cada política de `pg_policies` aparece documentada y que no hay ninguna documentada que no exista.
-10. **Cierre.**
+10. ✅ **Cierre.**
     - Ítems del checklist en `[x]`; trackear `referenceSecurity.md` y `politicas-rls.md`.
     - Actualizar `references/juegos-implementados.md` si menciona el modo invitado.
     - Bump `0.6.0 → 0.7.0` en `package.json` + entrada `[0.7.0]` en `CHANGELOG.md`.
@@ -201,7 +201,7 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
 
 **Headers**
 
-- [ ] `curl -I` sobre `/`, `/auth` y `/juegos/caida/jugar` (incluido el 307 del redirect) devuelve los 5 headers con los valores exactos del alcance.
+- [ ] `curl -I` sobre `/`, `/auth` y `/juegos/caida/jugar` (incluido el 307 del redirect) devuelve los headers con los valores exactos del alcance: los 5 en producción (`next start`), 4 en dev (sin HSTS).
 - [ ] El juego carga y se juega por la IP de la LAN desde el celular.
 
 **Textos**
@@ -236,7 +236,7 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
 | **Copiar las cookies refrescadas al redirect.**                                                             | `NextResponse.redirect` directo.                                | Si no, un token refrescado en ese request se pierde y la sesión se cae.                                                                  |
 | **Headers en `next.config.ts`** (`headers()`).                                                              | Ponerlos en el proxy.                                           | El `matcher` del proxy excluye `_next/static` e imágenes; `next.config` cubre todo y el proxy queda con una sola responsabilidad.        |
 | **5 headers:** los 3 del checklist + `Permissions-Policy` + HSTS.                                           | Agregar también CSP.                                            | CSP en Next con Supabase/OAuth requiere nonces y afinarla; va en su propio spec.                                                         |
-| **HSTS sin `preload`.**                                                                                     | Con `preload`.                                                  | Difícil de revertir y todavía no hay dominio de producción.                                                                              |
+| **HSTS sin `preload`.**                                                                                     | Con `preload`.                                                  | Difícil de revertir y todavía no hay dominio de producción. Además, solo con `NODE_ENV === "production"` (code review): en dev con HTTPS fijaría localhost.                                                                              |
 | **La 007 reescribe solo las 2 políticas con `auth.uid()`**, a `authenticated` y con `WITH CHECK` explícito. | Reescribir todas las políticas.                                 | Las de SELECT público no usan `auth.*` y ya cumplen.                                                                                     |
 | **Índice `scores_user_id_idx`** incluido.                                                                   | Dejarlo para otro spec.                                         | Una línea, sin riesgo, cierra el advisor INFO.                                                                                           |
 | **Configuración del dashboard aplicada por el usuario**; el spec la documenta y verifica.                   | Automatizarla vía Management API.                               | El MCP no la expone y ya estaba hecha al escribir el spec.                                                                               |
@@ -365,3 +365,43 @@ Ajustes de Supabase Auth informados por el usuario (dashboard → Authentication
 - **Hallazgos documentados (fuera de alcance, para specs futuros):**
   - `anon` y `authenticated` tienen todos los grants por defecto de Supabase en las 3 tablas (incluido `TRUNCATE`, que RLS no cubre; PostgREST no lo expone). → auditoría de grants.
   - La UPDATE de `profiles` no limita columnas: un usuario con sesión puede cambiar su `username` por la API sin la validación de formato de `signUp` (lo frenan `UNIQUE` y `profiles_username_lower_key`, no el regex). → spec de "cambiar usuario" o un `CHECK` en la base.
+
+### Paso 10 — Cierre (2026-10-25)
+
+- `references/security-checklist/referenceSecurity.md`: los 5 ítems en `[x]` con cómo quedó cada uno (leaked password protection: cubierta en la app, el toggle es de Pro), un ítem agregado (protección de rutas) y el volcado crudo de los advisors reemplazado por una tabla de estado (3 resueltos, 1 que sigue por el plan). Ya estaba trackeado desde el commit del paso 9.
+- `references/juegos-implementados.md` y `README.md` no mencionan el modo invitado: sin cambios.
+- `npm version 0.7.0 --no-git-tag-version` (actualiza `package.json` y `package-lock.json`). `CHANGELOG.md`: entrada `[0.7.0] - 2026-10-25` con Added/Changed y link al spec.
+- `npm run lint` sin errores. `npm run build` OK (Next 16.2.10, Turbopack; con el dev server corriendo, sin conflictos). El Footer de `/games` muestra `0.7.0`.
+
+## Lecciones aprendidas
+
+1. **Probar la configuración del dashboard con un caso que la ejercite y leer `auth_logs`.** El "Algo salió mal" genérico de la app ocultaba que `password123` ni llegaba al chequeo de filtradas: lo frenaba una regla de composición que nadie había mencionado. Sin los logs, se habría concluido mal.
+2. **Las funciones de pago se verifican antes de escribirlas en el spec.** La leaked password protection de Supabase es solo de Pro; el spec la daba por activada. Cubrirla en la app con la API Pwned Passwords costó un archivo y es la misma fuente.
+3. **Para probar una segunda línea de defensa, comprobar que la primera está realmente apagada.** El `sed` que vaciaba `PROTECTED_ROUTES` no reemplazó nada y el 307 venía del proxy. La señal correcta fue el body: `NEXT_REDIRECT` solo lo genera la página.
+4. **El Playwright MCP imprime lo que se escribe.** `browser_fill_form` y `browser_run_code_unsafe` muestran el código y los valores, así que un secreto pasado por ahí queda en el transcript. Para credenciales, un script Node propio que lea `.env.local` y solo informe longitudes y resultados.
+5. **Un hash bcrypt no se recupera; se rota.** Si la contraseña de la cuenta de prueba no coincide, lo rápido es asignarle una nueva con la API admin y escribirla en `.env.local` sin mostrarla.
+6. **Cambiar una regla de producto obliga a barrer los textos.** "Jugar requiere cuenta" dejó mal la FAQ, el botón de invitado, el tagline de la home y el skill `/add-game-impl`. Solo dos estaban en el spec: el resto apareció con `grep`.
+
+## Code review (2026-10-25)
+
+`/code-review high` sobre `master...HEAD` + cambios sin commitear. 10 hallazgos; 7 corregidos, 3 anotados (decisión del usuario).
+
+**Corregidos:**
+
+| # | Hallazgo | Corrección |
+|---|---|---|
+| 1 | Con sesión y **sin perfil**, `jugar/page.tsx` redirigía a `/auth` y el proxy de vuelta a `/`: el usuario nunca podía jugar ni veía un error. | `getSessionUsername()` → `getSessionPlayer()` (`lib/session.ts`): `null` solo sin sesión; con sesión devuelve `{ username }` aunque sea `null`. La página redirige solo sin sesión; sin perfil se juega sin guardar. |
+| 2 | El HUD mock (juegos sin motor) mostraba "INVITADO" a usuarios con sesión. | Muestra el `username` (fallback "INVITADO" solo si falta el perfil). |
+| 4 | `updatePassword` llamaba a HIBP antes de `isRecoverySession()`: cualquiera podía usar el servidor de proxy a HIBP. | `isRecoverySession()` primero. |
+| 5 | En `signUp`, HIBP (hasta 3 s) corría antes que "usuario ya en uso". | HIBP pasa a ser la última validación antes de `supabase.auth.signUp`. Medido: usuario tomado + `Password123` → "Ese usuario ya está en uso." en 238 ms. |
+| 6 | Sesión y juego se pedían en serie. | `Promise.all([getSessionPlayer(), getGameById(id)])`. |
+| 7 | La segunda línea perdía el query string (el proxy lo conservaba). | Helper común `authRedirectPath(next)` en `lib/auth-errors.ts` (usa `safeNext`), usado por `route-guards.ts` y por la página, que rearma el query desde `searchParams`. |
+| 10 | HSTS se enviaba también en dev. | Solo con `NODE_ENV === "production"`. |
+
+**Verificación:** `tsc` y `lint` OK. Dev: `/juegos/caida/jugar?skin=neon&x=1` → `307 /auth?next=%2Fjuegos%2Fcaida%2Fjugar%3Fskin%3Dneon%26x%3D1`; con `PROTECTED_ROUTES = []` (temporal, revertido) la página da el mismo destino (`NEXT_REDIRECT;replace;…%3Fskin%3Dneon%26x%3D1;307`). Login con `e2e_bot` → juego con canvas. Dev sin HSTS; `next start -p 3100` con los 5 headers y el 307. Un primer `npm run build` falló con `next/font/google queries have exactly one entry` (×18) y el siguiente, sin cambios de código, pasó: fallo intermitente de Turbopack, probablemente en paralelo a la recompilación del dev server por el toggle de `route-guards.ts`.
+
+**Anotados, no corregidos (para specs futuros):**
+
+- **#3 — Ramas de invitado en `game-player-shell.tsx`** ("INVITADO", CTA "Inicia sesión para guardar…", `if (!username) return` al guardar): con "jugar requiere cuenta" solo se alcanzan si falta el perfil. Quedan como fallback defensivo (decisión del spec) y `/add-game-impl` prohíbe tocar el shell. Deuda: limpiarlas en un spec que toque el shell.
+- **#8 — Regla de `/auth` duplicada en proxy y página**, y `/auth` con sesión ignora `next`. Es la segunda línea de defensa pedida por la guía de Next; ignorar `next` viene del spec 15.
+- **#9 — El texto de composición fija "minúscula, mayúscula y número"**, que depende del dashboard. Se dejó un comentario junto a la traducción en `lib/auth-errors.ts`.

@@ -5,7 +5,7 @@ import "./globals.css";
 
 /**
  * Error boundary raíz: atrapa excepciones lanzadas por el propio RootLayout
- * (ej. `getSessionUsername` en lib/session.ts si Supabase no responde), casos
+ * (ej. `getSessionPlayer` en lib/session.ts si Supabase no responde), casos
  * que app/error.tsx NO cubre porque ese boundary no envuelve el layout de su
  * mismo segmento. Al reemplazar el layout entero, no hay Nav/Footer — este
  * archivo define su propio <html>/<body> y evita depender de fuentes
