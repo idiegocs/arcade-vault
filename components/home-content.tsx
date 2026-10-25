@@ -429,8 +429,8 @@ export function HomeContent({ games }: { games: Game[] }) {
             <div className="faq-item">
               <div className="faq-q pixel">¿NECESITO CREAR CUENTA?</div>
               <div className="faq-a">
-                No. Puedes jugar como invitado. Si quieres guardar tu puntuación y aparecer en el
-                ranking, regístrate en 10 segundos.
+                Sí, para jugar necesitas una cuenta (es gratis y tarda 10 segundos). El catálogo y
+                el Salón de la Fama son públicos.
               </div>
             </div>
             <div className="faq-item">
@@ -449,7 +449,7 @@ export function HomeContent({ games }: { games: Game[] }) {
         <Link href="/games" className="btn xl pulse final-cta">
           INSERTAR MONEDA →
         </Link>
-        <div className="final-tag">Gratis. Sin registro obligatorio. Empieza en segundos.</div>
+        <div className="final-tag">Gratis. Crea tu cuenta en segundos y empieza a jugar.</div>
       </section>
     </div>
   );

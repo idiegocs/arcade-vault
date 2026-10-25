@@ -187,7 +187,7 @@ export function AuthForm({ next, linkError }: { next: string; linkError: string 
         )}
 
         <Link href="/games" className="btn ghost" style={{ width: "100%", marginTop: 10 }}>
-          JUGAR COMO INVITADO
+          VER CATÁLOGO
         </Link>
 
         <div className="auth-divider">O CONTINÚA CON</div>

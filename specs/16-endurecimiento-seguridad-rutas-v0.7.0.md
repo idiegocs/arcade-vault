@@ -63,6 +63,7 @@ Políticas actuales (`pg_policies`): `games_select_public` (SELECT, `true`), `"P
 - **Textos que dejan de ser ciertos:**
   - `components/auth-form.tsx`: **JUGAR COMO INVITADO** → **VER CATÁLOGO** (→ `/games`).
   - FAQ "¿NECESITO CREAR CUENTA?" en `components/home-content.tsx`: _"Sí, para jugar necesitas una cuenta (es gratis y tarda 10 segundos). El catálogo y el Salón de la Fama son públicos."_
+  - _(Agregado durante la implementación, 2026-10-25)_ Tagline final de la home (`home-content.tsx`): "Gratis. Sin registro obligatorio. Empieza en segundos." → "Gratis. Crea tu cuenta en segundos y empieza a jugar."
 - **Agentes con Playwright:** `@mobile-porter` y `@game-performance-booster` hacen login antes de abrir `/juegos/<id>/jugar`, con un usuario de prueba vía `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` en `.env.local` (nunca commiteadas). Sus `.md` lo documentan; si faltan las variables, se detienen y avisan. El usuario crea la cuenta de prueba.
 - **Documentación de políticas:** `references/security-checklist/politicas-rls.md` — inventario por tabla (RLS activo, cada política con nombre/comando/roles/`USING`/`WITH CHECK` y qué permite en palabras simples, qué **no** se permite y por qué, funciones `SECURITY DEFINER` que saltan RLS — solo listadas —, migración que define cada política, fecha y query para regenerarlo). Una línea en "Key rules" de `CLAUDE.md`: todo cambio de políticas RLS se refleja ahí.
 - **Checklist:** `references/security-checklist/referenceSecurity.md` con todos los ítems en `[x]` y trackeado en git (hoy está sin trackear).
@@ -144,7 +145,7 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
      - `/auth/callback` (OAuth Google/GitHub) sigue funcionando;
      - `/games`, `/juegos/caida`, `/salon-de-la-fama` abren sin sesión;
      - `next=//evil.com` termina en `/`.
-7. **Textos.** JUGAR COMO INVITADO → VER CATÁLOGO en `components/auth-form.tsx`; FAQ en `components/home-content.tsx`. Verificar en el navegador textos y enlace a `/games`.
+7. ✅ **Textos.** JUGAR COMO INVITADO → VER CATÁLOGO en `components/auth-form.tsx`; FAQ en `components/home-content.tsx`. Verificar en el navegador textos y enlace a `/games`.
 8. **Agentes con Playwright.**
    - En `.claude/agents/mobile-porter.md` y `.claude/agents/game-performance-booster.md`: paso de login previo (`/auth` → usuario y contraseña desde `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` de `.env.local`); sin variables, se detienen y avisan.
    - Documentar las variables en `.env.example` si existe; si no, en este spec.
@@ -325,3 +326,10 @@ Ajustes de Supabase Auth informados por el usuario (dashboard → Authentication
 - **Playwright:** `/juegos/caida/jugar` → `/auth?next=…` → ▣ GITHUB → vuelve a `/juegos/caida/jugar` con canvas y `IDIEGOCS`. Con sesión, `/auth?next=//evil.com` → `/`. Sin sesión, `/auth?next=//evil.com` → GitHub → `/`. Con sesión normal (no recovery), `/auth/restablecer` → página → `/auth` → proxy → `/`.
 - **Segunda línea:** con `PROTECTED_ROUTES = []` (temporal, ya revertido), `/juegos/caida/jugar` igual da 307 y el body trae `NEXT_REDIRECT;replace;/auth?next=%2Fjuegos%2Fcaida%2Fjugar;307` (lo genera la página, el redirect del proxy no tiene ese body). Un primer intento con `sed` no reemplazó la línea y probó el proxy en vez de la página; se repitió con Edit.
 - **Pendiente para la verificación final:** el flujo "¿Olvidaste tu contraseña?" de punta a punta (necesita el correo) y que el refresco de cookies sobreviva a un redirect con el token por vencer (difícil de forzar; el código copia las cookies).
+
+### Paso 7 — Textos (2026-10-25)
+
+- `components/auth-form.tsx`: el `Link` a `/games` dice **VER CATÁLOGO** (antes JUGAR COMO INVITADO).
+- `components/home-content.tsx`, FAQ "¿NECESITO CREAR CUENTA?": "Sí, para jugar necesitas una cuenta (es gratis y tarda 10 segundos). El catálogo y el Salón de la Fama son públicos."
+- **Verificación (Playwright):** en `/auth`, "VER CATÁLOGO" → `href="/games"` y no queda "JUGAR COMO INVITADO"; el HTML de `/` trae la FAQ nueva y no la vieja.
+- **Barrido de textos:** `grep` de "invitado / sin cuenta / sin registro" en `app`, `components`, `lib`, README y `juegos-implementados.md`. Quedan el "INVITADO" del HUD mock y del player (fallback defensivo, decidido en el spec) y el tagline de la home `home-content.tsx:452` "Gratis. Sin registro obligatorio. Empieza en segundos.", que ya no es cierto y no estaba en el alcance → **cambiado a "Gratis. Crea tu cuenta en segundos y empieza a jugar."** (decisión del usuario, 2026-10-25).
