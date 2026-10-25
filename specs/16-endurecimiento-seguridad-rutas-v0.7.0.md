@@ -135,7 +135,7 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
    - Leer antes `01-getting-started/16-proxy.md`, `03-api-reference/03-file-conventions/proxy.md` y _Optimistic checks with Proxy_ de `02-guides/authentication.md`.
    - Mover el refresco de sesión a `lib/proxy/session.ts` (`updateSession(request) → { response, user }`); `proxy.ts` solo lo llama. `matcher` igual.
    - Verificar login, logout, guardado de puntaje y que al recargar se sigue logueado.
-6. **Reglas de rutas.**
+6. ✅ **Reglas de rutas.**
    - `lib/proxy/route-guards.ts` con `PROTECTED_ROUTES` y las reglas de `/auth` y `/auth/restablecer`; `proxy.ts` las aplica y copia las cookies de `session.ts` a la respuesta del redirect.
    - `redirect` de segunda línea en `app/juegos/[id]/jugar/page.tsx`.
    - Verificar:
@@ -314,3 +314,14 @@ Ajustes de Supabase Auth informados por el usuario (dashboard → Authentication
 - `lib/proxy/session.ts`: `updateSession(request) → { response, user }`. Es el código del spec 04 movido tal cual (mismo `setAll` que recrea `NextResponse.next({ request })`), solo que ahora devuelve el `user` del `getUser()` que ya se hacía.
 - `proxy.ts`: solo `const { response } = await updateSession(request); return response;`. Mismo `matcher` y misma exportación nombrada `proxy`.
 - **Verificación:** `tsc --noEmit` OK. Playwright: login con ▣ GITHUB → `/`; `/games` con sesión; `/juegos/caida/jugar` muestra `IDIEGOCS` (no INVITADO) y el canvas; Salir → `/` con "Iniciar Sesión". El guardado de puntaje se cubrió a nivel RLS en el paso 1 (INSERT como `authenticated`); jugar una partida completa queda para la verificación final.
+
+### Paso 6 — Reglas de rutas (2026-10-25)
+
+- `lib/proxy/route-guards.ts`: `guardRoute(request, user) → URL | null`. `PROTECTED_ROUTES = [/^\/juegos\/[^/]+\/jugar\/?$/]` (regex: el id es dinámico). Sin sesión → `/auth?next=<pathname+search>` pasado por `safeNext`. Con sesión, solo `/auth` (y `/auth/`) → `/`; `/auth/restablecer` queda fuera de esa regla a propósito. Sin sesión, `/auth/restablecer*` → `/auth`.
+- `proxy.ts`: si `guardRoute` devuelve URL, crea `NextResponse.redirect` y copia `response.cookies.getAll()` (las que `getUser()` refrescó) con `redirect.cookies.set(cookie)`.
+- `app/juegos/[id]/jugar/page.tsx`: segunda línea al inicio, antes de buscar el juego — sin `username`, `redirect('/auth?next=…')`. Cubre también el HUD mock de juegos sin motor. Se reusa `getSessionUsername()` (ya se llamaba); una cuenta sin perfil termina en `/auth` → `/`, sin loop.
+- **Loop `next=/auth`:** no hizo falta tocar `safeNext`. El proxy nunca genera un `next` hacia `/auth`, y un `?next=/auth` externo termina en `/` por la regla "con sesión, `/auth` → `/`".
+- **Verificación sin sesión (`curl`):** `/juegos/caida/jugar` → `307 /auth?next=%2Fjuegos%2Fcaida%2Fjugar`; con `?skin=neon` el query viaja en `next`; `/auth/restablecer` → `307 /auth`; `/`, `/games`, `/juegos/caida`, `/salon-de-la-fama`, `/about`, `/auth` → 200; `/auth/callback` y `/api/contact` siguen con su comportamiento propio (`307 ?error=enlace` sin `code`, 405 en GET). El 307 trae los 5 headers de seguridad.
+- **Playwright:** `/juegos/caida/jugar` → `/auth?next=…` → ▣ GITHUB → vuelve a `/juegos/caida/jugar` con canvas y `IDIEGOCS`. Con sesión, `/auth?next=//evil.com` → `/`. Sin sesión, `/auth?next=//evil.com` → GitHub → `/`. Con sesión normal (no recovery), `/auth/restablecer` → página → `/auth` → proxy → `/`.
+- **Segunda línea:** con `PROTECTED_ROUTES = []` (temporal, ya revertido), `/juegos/caida/jugar` igual da 307 y el body trae `NEXT_REDIRECT;replace;/auth?next=%2Fjuegos%2Fcaida%2Fjugar;307` (lo genera la página, el redirect del proxy no tiene ese body). Un primer intento con `sed` no reemplazó la línea y probó el proxy en vez de la página; se repitió con Edit.
+- **Pendiente para la verificación final:** el flujo "¿Olvidaste tu contraseña?" de punta a punta (necesita el correo) y que el refresco de cookies sobreviva a un redirect con el token por vencer (difícil de forzar; el código copia las cookies).
