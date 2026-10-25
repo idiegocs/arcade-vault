@@ -44,9 +44,13 @@ Políticas actuales (`pg_policies`): `games_select_public` (SELECT, `true`), `"P
   - `Strict-Transport-Security: max-age=63072000; includeSubDomains` (sin `preload`)
 - **Configuración de Supabase Auth (dashboard) — aplicada por el usuario el 2026-10-25.** Se documenta en este spec (ruta del dashboard y valores) y se verifica:
   - Contraseña mínima de 8 caracteres.
-  - Leaked password protection (HaveIBeenPwned) activada.
+  - ~~Leaked password protection (HaveIBeenPwned) activada.~~ _(Ajuste durante la implementación, 2026-10-25: el toggle es solo del plan Pro y el proyecto está en Free → se cubre en la app, ver abajo.)_
+  - Requisitos de composición (minúsculas, mayúsculas y dígitos) _(descubierto al probar el paso 3: ya estaba activo en el dashboard)_.
   - Rate limit de signups por IP.
-- **Traducción en `lib/auth-errors.ts`:** el mensaje de contraseña filtrada de Supabase (_"Password is known to be weak and easy to guess…"_) se muestra como "Esa contraseña apareció en filtraciones conocidas. Elige otra." La entrada existente `"weak password"` no lo captura.
+- **Traducciones en `lib/auth-errors.ts`:**
+  - Contraseña filtrada de Supabase (_"Password is known to be weak and easy to guess…"_) → `PWNED_PASSWORD` = "Esa contraseña apareció en filtraciones conocidas. Elige otra." La entrada existente `"weak password"` no lo captura.
+  - _(Agregado durante la implementación, 2026-10-25, decisión del usuario)_ Regla de composición (_"Password should contain at least one character of each…"_) → "La contraseña debe tener al menos una minúscula, una mayúscula y un número."
+- **Leaked password protection en la app** _(agregado durante la implementación, 2026-10-25, decisión del usuario — plan Free)_: `lib/pwned-password.ts` (`isPwnedPassword(password)`) consulta la API Pwned Passwords de HaveIBeenPwned con k-anonymity (solo viajan los 5 primeros caracteres del SHA-1, con `Add-Padding: true`, timeout 3 s, `cache: "no-store"`). Se llama en `signUp` y `updatePassword` de `app/actions/auth.ts`, después de la validación de longitud y antes de Supabase; el login no se toca. **Fail-open:** si HIBP no responde, se deja pasar con un `console.warn`.
 - **Protección de rutas con `proxy.ts`**, siguiendo la guía de Next 16 (`node_modules/next/dist/docs/01-app/01-getting-started/16-proxy.md` = https://nextjs.org/docs/app/getting-started/proxy): un solo `proxy.ts` con la lógica en módulos, solo chequeos optimistas, sin consultas a la base.
   - **`lib/proxy/session.ts`:** el refresco de sesión que ya existe (`createServerClient` + `getUser()`) se mueve acá; devuelve `{ response, user }`.
   - **`lib/proxy/route-guards.ts`:** reglas declarativas que reciben la ruta y el `user`:
@@ -71,7 +75,7 @@ Políticas actuales (`pg_policies`): `games_select_public` (SELECT, `true`), `"P
 - **Captcha** (Turnstile/hCaptcha) en registro/login.
 - **Rate limiting propio** en Server Actions (p. ej. `saveScore`). Se usan los límites de Supabase Auth.
 - **Auditoría de funciones `SECURITY DEFINER`** (`handle_new_user`, `email_for_username`) y de grants.
-- **Cambios en la validación de la app** — `MIN_PASSWORD = 8` ya existe y no se toca.
+- **Cambios en la validación de la app** — `MIN_PASSWORD = 8` ya existe y no se toca; la regla de composición no se replica en la app (solo se traduce el error de Supabase). La única validación nueva es el chequeo HIBP.
 - **URLs de producción / dominio real.**
 - **Proteger otras rutas:** `/`, `/games`, `/juegos/[id]` (ficha), `/salon-de-la-fama` y `/about` siguen públicas.
 - **Autorización por roles** (admin, etc.) en el proxy.
@@ -120,12 +124,12 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
    - En `next.config.ts`: constante `securityHeaders` + `headers()` con `source: '/(.*)'`, sin tocar `turbopack` ni `allowedDevOrigins`.
    - Verificar con `npm run dev` + `curl -I http://localhost:3000/` y sobre una ruta de juego que vengan los 5 headers.
    - Confirmar que OAuth (Google/GitHub) sigue funcionando.
-3. **Mensaje de contraseña filtrada.**
-   - En `lib/auth-errors.ts`, agregar `["known to be weak", "Esa contraseña apareció en filtraciones conocidas. Elige otra."]` **antes** de `"weak password"`.
-   - Verificar que registrarse con `password123` muestra el mensaje en español (confirma también que la leaked password protection está activa).
+3. ✅ **Mensaje de contraseña filtrada + chequeo HIBP en la app.**
+   - En `lib/auth-errors.ts`, agregar `["known to be weak", PWNED_PASSWORD]` **antes** de `"weak password"`, y la traducción de la regla de composición.
+   - `lib/pwned-password.ts` + llamada en `signUp` y `updatePassword`.
+   - Verificar: `Password123` → mensaje de filtrada sin crear cuenta; una contraseña sin mayúsculas → mensaje de composición; contraseña aleatoria → no filtrada; HIBP caído → fail-open.
 4. **Verificación de la configuración del dashboard.**
-   - `get_advisors` seguridad: sin `auth_leaked_password_protection`.
-   - Si persiste, avisar al usuario para revisar el toggle en Authentication → Providers → Email / _Password security_.
+   - `get_advisors` seguridad: `auth_leaked_password_protection` **sigue apareciendo** (esperado en Free; cubierto por el chequeo de la app).
    - Documentar en este spec los valores configurados (contraseña mínima, leaked password protection, rate limit de signups).
 5. **Proxy en módulos (sin cambio de comportamiento).**
    - Leer antes `01-getting-started/16-proxy.md`, `03-api-reference/03-file-conventions/proxy.md` y _Optimistic checks with Proxy_ de `02-guides/authentication.md`.
@@ -167,12 +171,16 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
 - [ ] `"Users can update their own profile"`: `roles = {authenticated}`, `qual` y `with_check` = `((SELECT auth.uid()) = id)`.
 - [ ] Existe `scores_user_id_idx` sobre `scores(user_id)`.
 - [ ] `get_advisors` performance no reporta `auth_rls_initplan` ni `unindexed_foreign_keys`.
-- [ ] `get_advisors` seguridad no reporta `auth_leaked_password_protection`.
+- [ ] ~~`get_advisors` seguridad no reporta `auth_leaked_password_protection`.~~ _No aplicable en plan Free (el toggle es de Pro): el warning sigue apareciendo y la protección la da `lib/pwned-password.ts`._
 - [ ] Con sesión, terminar una partida guarda el puntaje y aparece en el ranking.
 
 **Auth**
 
-- [ ] Registrarse con `password123` muestra "Esa contraseña apareció en filtraciones conocidas. Elige otra." y no crea la cuenta.
+- [ ] Registrarse con `Password123` muestra "Esa contraseña apareció en filtraciones conocidas. Elige otra." y no crea la cuenta.
+- [ ] Restablecer la contraseña con `Password123` en `/auth/restablecer` muestra el mismo mensaje y no la cambia.
+- [ ] Registrarse con una contraseña sin mayúsculas ni dígitos (no filtrada) muestra "La contraseña debe tener al menos una minúscula, una mayúscula y un número."
+- [ ] Con HIBP inaccesible, el registro sigue funcionando (fail-open) y queda un `console.warn` en el servidor.
+- [ ] Solo los 5 primeros caracteres del SHA-1 salen del servidor (revisión de `lib/pwned-password.ts`).
 - [ ] Registrarse con 7 caracteres muestra "La contraseña debe tener al menos 8 caracteres."
 - [ ] Login con Google, GitHub y usuario/contraseña siguen funcionando.
 - [ ] El spec documenta los valores configurados en el dashboard (contraseña mínima, leaked password protection, rate limit de signups).
@@ -215,25 +223,29 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
 
 ## Decisiones tomadas y descartadas
 
-| Decisión                                                                                                    | Alternativa descartada                  | Por qué                                                                                                                           |
-| ----------------------------------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Jugar requiere cuenta** (`/juegos/[id]/jugar` protegida).                                                 | Mantener el modo invitado del spec 15.  | Decisión del usuario (2026-10-25). Revierte la del spec 15 → bump minor (0.7.0).                                                  |
-| Catálogo, fichas, Salón de la Fama, home y About **siguen públicos**.                                       | Proteger todo el sitio.                 | Se puede explorar juegos y ranking sin registrarse; solo jugar exige cuenta.                                                      |
-| **JUGAR COMO INVITADO → VER CATÁLOGO** (`/games`).                                                          | Quitar el botón.                        | Mantiene una salida para quien aún no quiere registrarse.                                                                         |
-| **Un solo `proxy.ts` orquestador** + `lib/proxy/session.ts` y `lib/proxy/route-guards.ts`.                  | Toda la lógica en `proxy.ts`.           | Recomendado por la guía de Next 16 (`16-proxy.md`): un archivo de proxy, organizado en módulos.                                   |
-| **El proxy solo hace chequeos optimistas** reusando `getUser()`.                                            | Consultar `profiles`/roles en el proxy. | La guía: _"not intended for slow data fetching"_ ni autorización completa; corre en cada request, incluidos prefetch.             |
-| **Se mantienen los chequeos en las páginas** y se agrega uno en `jugar/page.tsx`.                           | Confiar solo en el proxy.               | La guía de auth pide que el proxy no sea la única defensa; RLS sigue siendo la protección real de los datos.                      |
-| **Copiar las cookies refrescadas al redirect.**                                                             | `NextResponse.redirect` directo.        | Si no, un token refrescado en ese request se pierde y la sesión se cae.                                                           |
-| **Headers en `next.config.ts`** (`headers()`).                                                              | Ponerlos en el proxy.                   | El `matcher` del proxy excluye `_next/static` e imágenes; `next.config` cubre todo y el proxy queda con una sola responsabilidad. |
-| **5 headers:** los 3 del checklist + `Permissions-Policy` + HSTS.                                           | Agregar también CSP.                    | CSP en Next con Supabase/OAuth requiere nonces y afinarla; va en su propio spec.                                                  |
-| **HSTS sin `preload`.**                                                                                     | Con `preload`.                          | Difícil de revertir y todavía no hay dominio de producción.                                                                       |
-| **La 007 reescribe solo las 2 políticas con `auth.uid()`**, a `authenticated` y con `WITH CHECK` explícito. | Reescribir todas las políticas.         | Las de SELECT público no usan `auth.*` y ya cumplen.                                                                              |
-| **Índice `scores_user_id_idx`** incluido.                                                                   | Dejarlo para otro spec.                 | Una línea, sin riesgo, cierra el advisor INFO.                                                                                    |
-| **Configuración del dashboard aplicada por el usuario**; el spec la documenta y verifica.                   | Automatizarla vía Management API.       | El MCP no la expone y ya estaba hecha al escribir el spec.                                                                        |
-| **Traducir "known to be weak"** antes de "weak password".                                                   | Dejar la entrada actual.                | El mensaje de contraseña filtrada no contiene "weak password" y caería en "Algo salió mal".                                       |
-| **`MIN_PASSWORD = 8` se mantiene en la app** además de Supabase.                                            | Validar solo en Supabase.               | Respuesta rápida, sin ir a la red, y con mensaje propio.                                                                          |
-| **Usuario de prueba vía `E2E_USER_*` en `.env.local`** para los agentes.                                    | Bypass del proxy en dev (`?e2e=1`).     | Un bypass de auth es justo lo que este spec busca evitar.                                                                         |
-| **Políticas documentadas en `politicas-rls.md`**, generado desde `pg_policies`.                             | Documentarlas a mano en el spec.        | Referencia viva y regenerable; `CLAUDE.md` solo apunta a ella.                                                                    |
+| Decisión                                                                                                    | Alternativa descartada                                          | Por qué                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Jugar requiere cuenta** (`/juegos/[id]/jugar` protegida).                                                 | Mantener el modo invitado del spec 15.                          | Decisión del usuario (2026-10-25). Revierte la del spec 15 → bump minor (0.7.0).                                                         |
+| Catálogo, fichas, Salón de la Fama, home y About **siguen públicos**.                                       | Proteger todo el sitio.                                         | Se puede explorar juegos y ranking sin registrarse; solo jugar exige cuenta.                                                             |
+| **JUGAR COMO INVITADO → VER CATÁLOGO** (`/games`).                                                          | Quitar el botón.                                                | Mantiene una salida para quien aún no quiere registrarse.                                                                                |
+| **Un solo `proxy.ts` orquestador** + `lib/proxy/session.ts` y `lib/proxy/route-guards.ts`.                  | Toda la lógica en `proxy.ts`.                                   | Recomendado por la guía de Next 16 (`16-proxy.md`): un archivo de proxy, organizado en módulos.                                          |
+| **El proxy solo hace chequeos optimistas** reusando `getUser()`.                                            | Consultar `profiles`/roles en el proxy.                         | La guía: _"not intended for slow data fetching"_ ni autorización completa; corre en cada request, incluidos prefetch.                    |
+| **Se mantienen los chequeos en las páginas** y se agrega uno en `jugar/page.tsx`.                           | Confiar solo en el proxy.                                       | La guía de auth pide que el proxy no sea la única defensa; RLS sigue siendo la protección real de los datos.                             |
+| **Copiar las cookies refrescadas al redirect.**                                                             | `NextResponse.redirect` directo.                                | Si no, un token refrescado en ese request se pierde y la sesión se cae.                                                                  |
+| **Headers en `next.config.ts`** (`headers()`).                                                              | Ponerlos en el proxy.                                           | El `matcher` del proxy excluye `_next/static` e imágenes; `next.config` cubre todo y el proxy queda con una sola responsabilidad.        |
+| **5 headers:** los 3 del checklist + `Permissions-Policy` + HSTS.                                           | Agregar también CSP.                                            | CSP en Next con Supabase/OAuth requiere nonces y afinarla; va en su propio spec.                                                         |
+| **HSTS sin `preload`.**                                                                                     | Con `preload`.                                                  | Difícil de revertir y todavía no hay dominio de producción.                                                                              |
+| **La 007 reescribe solo las 2 políticas con `auth.uid()`**, a `authenticated` y con `WITH CHECK` explícito. | Reescribir todas las políticas.                                 | Las de SELECT público no usan `auth.*` y ya cumplen.                                                                                     |
+| **Índice `scores_user_id_idx`** incluido.                                                                   | Dejarlo para otro spec.                                         | Una línea, sin riesgo, cierra el advisor INFO.                                                                                           |
+| **Configuración del dashboard aplicada por el usuario**; el spec la documenta y verifica.                   | Automatizarla vía Management API.                               | El MCP no la expone y ya estaba hecha al escribir el spec.                                                                               |
+| **Traducir "known to be weak"** antes de "weak password".                                                   | Dejar la entrada actual.                                        | El mensaje de contraseña filtrada no contiene "weak password" y caería en "Algo salió mal".                                              |
+| **Leaked password protection propia vía API Pwned Passwords (HIBP)** _(implementación, 2026-10-25)_.        | Pagar Pro para el toggle de Supabase, o no tener la protección. | Proyecto en plan Free. Es la misma fuente que usa Supabase, gratis y sin API key; con k-anonymity la contraseña nunca sale del servidor. |
+| **Fail-open si HIBP no responde.**                                                                          | Fail-closed ("No pudimos verificar la contraseña").             | Una caída externa no debe bloquear los registros; longitud y composición siguen aplicando. Decisión del usuario.                         |
+| **Chequeo HIBP solo en registro y restablecer**, no en login.                                               | También en el login.                                            | Una cuenta vieja con contraseña filtrada no queda bloqueada fuera; el chequeo actúa cuando se elige una contraseña.                      |
+| **Regla de composición solo traducida**, no replicada en la app.                                            | Validarla también en `auth.ts`.                                 | Cambio mínimo; Supabase ya la aplica. Decisión del usuario (A-a).                                                                        |
+| **`MIN_PASSWORD = 8` se mantiene en la app** además de Supabase.                                            | Validar solo en Supabase.                                       | Respuesta rápida, sin ir a la red, y con mensaje propio.                                                                                 |
+| **Usuario de prueba vía `E2E_USER_*` en `.env.local`** para los agentes.                                    | Bypass del proxy en dev (`?e2e=1`).                             | Un bypass de auth es justo lo que este spec busca evitar.                                                                                |
+| **Políticas documentadas en `politicas-rls.md`**, generado desde `pg_policies`.                             | Documentarlas a mano en el spec.                                | Referencia viva y regenerable; `CLAUDE.md` solo apunta a ella.                                                                           |
 
 ## Riesgos identificados
 
@@ -271,3 +283,16 @@ Cada paso deja el sistema funcional; pausa al terminar cada grupo para revisión
 - El dev server levantado recargó `next.config.ts` solo, sin reiniciar.
 - **Verificación (`curl -I`):** `/`, `/auth`, `/juegos/caida/jugar` y `/games` → 200 con los 5 headers y los valores exactos. Un chunk real de `/_next/static/chunks/…js` también los trae (por eso los headers no van en el proxy).
 - **OAuth:** con Playwright, clic en ▣ GITHUB en `/auth` → ida y vuelta completa a GitHub (el perfil de Playwright ya tenía sesión en GitHub) → `/` con "Entraste con GitHub · @idiegocs". `Referrer-Policy` y `X-Frame-Options` no afectan el redirect. Google no se probó por separado: comparte el mismo flujo (`signInWithOAuth` → `/auth/callback`).
+
+### Paso 3 — Contraseña filtrada: traducción + chequeo HIBP en la app (2026-10-25)
+
+- **Hallazgo 1 (regla de composición):** registrarse con `password123` mostraba "Algo salió mal". Los `auth_logs` de Supabase dieron el motivo real: `422 Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789.` El dashboard ya tenía requisitos de composición y ese mensaje no estaba traducido. → nueva entrada `"should contain at least one character of each"` en `lib/auth-errors.ts`.
+- **Hallazgo 2 (HIBP de Supabase inactivo):** `Password123` (cumple la composición) **creó la cuenta**: la leaked password protection de Supabase no está activa. El usuario confirmó plan Free, donde el toggle no existe. La cuenta de prueba (`spec16.leak.test@example.com`) se borró enseguida con `delete from auth.users where id = … and email = …`.
+- **Solución (decisión del usuario):** `lib/pwned-password.ts` con la API Pwned Passwords (`GET https://api.pwnedpasswords.com/range/<5 chars SHA-1>`, `Add-Padding: true`, `AbortSignal.timeout(3000)`, `cache: "no-store"`). Las líneas de padding traen `:0` y se descartan con `Number(count) > 0`. Se llama en `signUp` (después de longitud, antes de buscar el usuario y de `supabase.auth.signUp`) y en `updatePassword` (después de "no coinciden", antes de `isRecoverySession`). Mensaje compartido como constante `PWNED_PASSWORD` en `lib/auth-errors.ts` (también para el mensaje de Supabase, por si algún día se activa el toggle).
+- **Verificación:**
+  - `tsc --noEmit` y `eslint` de los 3 archivos: OK.
+  - Playwright en `/auth` → CREAR CUENTA: `Password123` → "Esa contraseña apareció en filtraciones conocidas. Elige otra."; `zqvkxmlpwrt8` (no filtrada, sin mayúsculas) → "La contraseña debe tener al menos una minúscula, una mayúscula y un número."
+  - Función aislada (Node 24 `--experimental-strip-types`, desde el scratchpad): `Password123` → `true`; `Vx9-<uuid>` → `false`; `fetch` que rechaza → `false` + `[auth] Pwned Passwords no disponible…` (fail-open).
+  - `auth.users` sin cuentas `spec16%` al terminar.
+- **Pendiente para los criterios:** restablecer con `Password123` en `/auth/restablecer` requiere una sesión de recuperación (enlace por correo); se prueba a mano en la verificación final.
+- **Lección:** antes de dar por buena una config del dashboard, probarla con un caso que la ejercite y mirar `auth_logs` — el mensaje genérico de la app ocultaba que la contraseña ni siquiera llegaba al chequeo esperado.

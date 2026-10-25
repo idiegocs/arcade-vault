@@ -11,6 +11,8 @@ export const PROVIDER_UNAVAILABLE = "Proveedor no disponible. Prueba con otro m�
 
 export const AUTH_UNAVAILABLE = "Algo salió mal. Intenta de nuevo en unos segundos.";
 
+export const PWNED_PASSWORD = "Esa contraseña apareció en filtraciones conocidas. Elige otra.";
+
 // Fragmentos (en minúsculas) de los mensajes de Supabase → texto en español.
 // El orden importa: gana el primero que aparece en el mensaje.
 const TRANSLATIONS: [string, string][] = [
@@ -19,6 +21,13 @@ const TRANSLATIONS: [string, string][] = [
   ["user already registered", "Ese correo ya tiene una cuenta. Inicia sesión."],
   ["already been registered", "Ese correo ya tiene una cuenta. Inicia sesión."],
   ["password should be at least", "La contraseña debe tener al menos 8 caracteres."],
+  // Leaked password protection (HaveIBeenPwned): "Password is known to be weak
+  // and easy to guess…" — no contiene "weak password".
+  ["known to be weak", PWNED_PASSWORD],
+  [
+    "should contain at least one character of each",
+    "La contraseña debe tener al menos una minúscula, una mayúscula y un número.",
+  ],
   ["weak password", "La contraseña es demasiado débil."],
   [
     "should be different from the old password",

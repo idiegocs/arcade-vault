@@ -7,9 +7,11 @@ import {
   AUTH_UNAVAILABLE,
   INVALID_CREDENTIALS,
   LINK_EXPIRED,
+  PWNED_PASSWORD,
   safeNext,
   translateAuthError,
 } from "@/lib/auth-errors";
+import { isPwnedPassword } from "@/lib/pwned-password";
 import { isRecoverySession } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -45,6 +47,9 @@ export async function signUp(
   }
   if (password.length < MIN_PASSWORD) {
     return { error: `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.` };
+  }
+  if (await isPwnedPassword(password)) {
+    return { error: PWNED_PASSWORD };
   }
 
   const supabase = await createClient();
@@ -162,6 +167,9 @@ export async function updatePassword(
   }
   if (password !== confirm) {
     return { error: "Las contraseñas no coinciden." };
+  }
+  if (await isPwnedPassword(password)) {
+    return { error: PWNED_PASSWORD };
   }
 
   // La página ya lo exige, pero la Server Action se puede invocar sin pasar por ella.
