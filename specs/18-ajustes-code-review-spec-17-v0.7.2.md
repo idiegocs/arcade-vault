@@ -1,6 +1,6 @@
 # SPEC 18 — Ajustes del code review del spec 17
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 
 > **Depende de:** 17-correcciones-auditoria-seguridad-v0.7.1 (`safeNext`, `signUp`, `/api/contact`, `server-only`)
 > **Fecha:** 2026-11-02
