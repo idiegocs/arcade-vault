@@ -17,6 +17,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   headers: async () => [{ source: "/(.*)", headers: securityHeaders }],
+  // Sin `X-Powered-By: Next.js` (spec 17): no anunciar el framework.
+  poweredByHeader: false,
   // Turbopack detecta otro lockfile en C:\Users\idieg\package-lock.json (fuera
   // del proyecto) y duda cuál es la raíz real — se la fijamos explícitamente.
   turbopack: {

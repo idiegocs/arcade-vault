@@ -74,7 +74,7 @@ flowchart LR
 1. ✅ **`safeNext`** — `lib/auth-errors.ts`: chequeo de la salida normalizada. Comentario que explique por qué (dot-segments: `/..//evil.com`). Probar con un script en el scratchpad (fuera del repo) la batería del spec 15 más los 6 casos de la auditoría: `"/..//evil.com"`, `"/.//evil.com"`, `"/../\\evil.com"`, `"/a/..//evil.com"`, `"/%2e%2e//evil.com"`, `"/.\\/evil.com"` → todos `"/"`; los destinos internos (`/juegos/caida`, `/juegos/caida/jugar?x=1#y`) se conservan; idempotencia en todos.
 2. ✅ **Registro neutral** — dashboard: activar "Confirm email" (lo hace el usuario; se documenta fecha y valor). Código: rama `user_already_exists` en `signUp` y quitar las 2 traducciones. Probar: registro con correo nuevo y con uno existente muestran el mismo aviso "REVISA TU CORREO"; el correo de confirmación llega y, abierto en el mismo navegador, inicia sesión.
 3. ✅ **`/api/contact`** — mover `EMAIL_RE` a `lib/validation.ts` (lo importan `app/actions/auth.ts` y la ruta) y aplicar la validación. Probar con `curl`: `{bad` → 400, `{}` → 400, `{"name":1,...}` → 400, email inválido → 400, `message` de 5001 caracteres → 400. Sin enviar correos reales salvo una prueba final desde `/about`.
-4. **`server-only` + `poweredByHeader`** — instalar, importar y desactivar el header. Probar: `npm run build` sin errores; `curl -sI /` sin `X-Powered-By`; un import temporal de `admin.ts` desde un `"use client"` rompe el build (se revierte).
+4. ✅ **`server-only` + `poweredByHeader`** — instalar, importar y desactivar el header. Probar: `npm run build` sin errores; `curl -sI /` sin `X-Powered-By`; un import temporal de `admin.ts` desde un `"use client"` rompe el build (se revierte).
 5. **Cierre** — `npm run lint`, `npm run build`, `referenceSecurity.md`, `package.json` 0.7.1, `CHANGELOG.md`, bitácora y lecciones en este spec. Opcional: `@security-guardian diff` sobre la rama.
 
 ## Criterios de aceptación
@@ -138,3 +138,12 @@ flowchart LR
 - **Prueba con Playwright** desde `/about`: un mensaje válido devolvió `200 {"ok":true}` y llegó a `CONTACT_EMAIL`. Captura: `.playwright-screenshot/spec17-contacto-ok.png`.
 - **No se probó en vivo** el `500` por una falla de Resend, porque haría falta romper `RESEND_API_KEY`. Está verificado por revisión de código: el `catch` ya no lee `error.message`.
 - El formulario de `/about` sigue mostrando `data.error`. Ahora siempre es un texto propio en español.
+
+### Paso 4 — `server-only` + `poweredByHeader` (2026-11-02)
+
+- `npm i server-only` (`^0.0.1` en `dependencies`). `import "server-only"` en la primera línea de `lib/supabase/admin.ts` y `lib/pwned-password.ts`.
+- `next.config.ts`: `poweredByHeader: false`.
+- **Pruebas:**
+  - `npm run build`: OK, las 11 rutas igual que antes.
+  - **Prueba negativa:** se agregaron dos archivos temporales, `components/sg17-probe.tsx` (`"use client"`, importa `createAdminClient`) y `app/sg17-probe/page.tsx`. Con ellos el build falla: _"You're importing a module that depends on "server-only"… ./lib/supabase/admin.ts [Client Component Browser]"_. Después se borraron y se confirmó con `git status`. La prueba se hizo con `admin.ts`; `pwned-password.ts` usa el mismo `import`.
+  - `curl -sI /` y `/auth` ya no traen `X-Powered-By`, y siguen los headers del spec 16 (`X-Frame-Options: DENY`). El dev server tomó el cambio de `next.config.ts` sin reiniciarlo.
