@@ -6,6 +6,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.7.1] - 2026-11-02
+
+Spec: [`17-correcciones-auditoria-seguridad-v0.7.1`](specs/17-correcciones-auditoria-seguridad-v0.7.1.md)
+
+### Changed
+
+- **El registro ya no revela qué correos tienen cuenta.** Hay que confirmar el correo para activar la cuenta, y registrarse con un correo ya usado muestra el mismo aviso "REVISA TU CORREO" que un alta nueva. El enlace de confirmación se abre en el mismo navegador donde se hizo el registro.
+- Tras iniciar sesión, la vuelta a la página de origen solo acepta rutas del propio sitio, también con rutas armadas con `..` (`/..//evil.com` → `/`).
+- El formulario de contacto valida los datos en el servidor (texto, largo máximo y formato del correo) y, si el envío falla, muestra un mensaje propio en vez del error del proveedor.
+- Las respuestas ya no incluyen el header `X-Powered-By`.
+- Los módulos con la clave secreta de Supabase o la consulta de contraseñas filtradas no se pueden importar desde código del navegador: el build falla.
+
 ## [0.7.0] - 2026-10-25
 
 Spec: [`16-endurecimiento-seguridad-rutas-v0.7.0`](specs/16-endurecimiento-seguridad-rutas-v0.7.0.md)

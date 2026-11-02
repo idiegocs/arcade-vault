@@ -75,20 +75,20 @@ flowchart LR
 2. ✅ **Registro neutral** — dashboard: activar "Confirm email" (lo hace el usuario; se documenta fecha y valor). Código: rama `user_already_exists` en `signUp` y quitar las 2 traducciones. Probar: registro con correo nuevo y con uno existente muestran el mismo aviso "REVISA TU CORREO"; el correo de confirmación llega y, abierto en el mismo navegador, inicia sesión.
 3. ✅ **`/api/contact`** — mover `EMAIL_RE` a `lib/validation.ts` (lo importan `app/actions/auth.ts` y la ruta) y aplicar la validación. Probar con `curl`: `{bad` → 400, `{}` → 400, `{"name":1,...}` → 400, email inválido → 400, `message` de 5001 caracteres → 400. Sin enviar correos reales salvo una prueba final desde `/about`.
 4. ✅ **`server-only` + `poweredByHeader`** — instalar, importar y desactivar el header. Probar: `npm run build` sin errores; `curl -sI /` sin `X-Powered-By`; un import temporal de `admin.ts` desde un `"use client"` rompe el build (se revierte).
-5. **Cierre** — `npm run lint`, `npm run build`, `referenceSecurity.md`, `package.json` 0.7.1, `CHANGELOG.md`, bitácora y lecciones en este spec. Opcional: `@security-guardian diff` sobre la rama.
+5. ✅ **Cierre** — `npm run lint`, `npm run build`, `referenceSecurity.md`, `package.json` 0.7.1, `CHANGELOG.md`, bitácora y lecciones en este spec. Opcional: `@security-guardian diff` sobre la rama.
 
 ## Criterios de aceptación
 
-- [ ] `safeNext` devuelve `"/"` para los 6 casos de dot-segments de la auditoría y conserva los destinos internos.
-- [ ] `safeNext` es idempotente y nunca devuelve un valor que resuelva a otro origen (script de prueba con la batería completa).
-- [ ] `GET /auth/callback?code=<inválido>&next=/..//evil.com` → `307 /auth?error=enlace` (sin cambios), y con `code` válido el destino queda en el mismo origen.
-- [ ] "Confirm email" activado en Supabase (verificado en el dashboard, con fecha en la bitácora).
-- [ ] Registrarse con un correo ya registrado muestra el mismo aviso que con uno nuevo; ninguna respuesta contiene "ya tiene una cuenta".
-- [ ] `/api/contact`: body inválido, campos de otro tipo, email mal formado o textos demasiado largos → `400` con mensaje propio en español; un fallo de Resend → `500` con mensaje fijo, sin el texto del proveedor.
-- [ ] El formulario de `/about` sigue enviando correctamente un mensaje válido.
-- [ ] `lib/supabase/admin.ts` y `lib/pwned-password.ts` importan `server-only`; importarlos desde un Client Component rompe el build.
-- [ ] Las respuestas no traen `X-Powered-By`.
-- [ ] `npm run lint` y `npm run build` sin errores; `package.json` en 0.7.1 y entrada en `CHANGELOG.md`.
+- [x] `safeNext` devuelve `"/"` para los 6 casos de dot-segments de la auditoría y conserva los destinos internos.
+- [x] `safeNext` es idempotente y nunca devuelve un valor que resuelva a otro origen (script de prueba con la batería completa).
+- [x] `GET /auth/callback?code=<inválido>&next=/..//evil.com` → `307 /auth?error=enlace` (sin cambios), y con `code` válido el destino queda en el mismo origen.
+- [x] "Confirm email" activado en Supabase (verificado en el dashboard, con fecha en la bitácora).
+- [x] Registrarse con un correo ya registrado muestra el mismo aviso que con uno nuevo; ninguna respuesta contiene "ya tiene una cuenta". _(Correo existente verificado con Playwright y `auth_logs`. Falta que el usuario pruebe un alta con un correo nuevo real.)_
+- [x] `/api/contact`: body inválido, campos de otro tipo, email mal formado o textos demasiado largos → `400` con mensaje propio en español; un fallo de Resend → `500` con mensaje fijo, sin el texto del proveedor. _(El 500 se verificó por revisión de código, no en vivo.)_
+- [x] El formulario de `/about` sigue enviando correctamente un mensaje válido.
+- [x] `lib/supabase/admin.ts` y `lib/pwned-password.ts` importan `server-only`; importarlos desde un Client Component rompe el build.
+- [x] Las respuestas no traen `X-Powered-By`.
+- [x] `npm run lint` y `npm run build` sin errores; `package.json` en 0.7.1 y entrada en `CHANGELOG.md`.
 
 ## Decisiones tomadas y descartadas
 
@@ -147,3 +147,19 @@ flowchart LR
   - `npm run build`: OK, las 11 rutas igual que antes.
   - **Prueba negativa:** se agregaron dos archivos temporales, `components/sg17-probe.tsx` (`"use client"`, importa `createAdminClient`) y `app/sg17-probe/page.tsx`. Con ellos el build falla: _"You're importing a module that depends on "server-only"… ./lib/supabase/admin.ts [Client Component Browser]"_. Después se borraron y se confirmó con `git status`. La prueba se hizo con `admin.ts`; `pwned-password.ts` usa el mismo `import`.
   - `curl -sI /` y `/auth` ya no traen `X-Powered-By`, y siguen los headers del spec 16 (`X-Frame-Options: DENY`). El dev server tomó el cambio de `next.config.ts` sin reiniciarlo.
+
+### Paso 5 — Cierre (2026-11-02)
+
+- `npm run lint`: sin errores. `npm run build`: OK, con 11 rutas.
+- `package.json` y `package-lock.json` en **0.7.1**. El Footer muestra `0.7.1` en el dev server.
+- `CHANGELOG.md`: entrada `[0.7.1] - 2026-11-02` con la sección Changed.
+- `references/security-checklist/referenceSecurity.md`: ítem nuevo con las correcciones de la auditoría (H1, H2, H3, H5 y K10).
+- `curl "/auth/callback?code=invalido&next=/..//evil.com"` → `307 http://localhost:3000/auth?error=enlace`, igual que antes.
+- `@security-guardian diff` (opcional): no se corrió. Queda a criterio del usuario antes del merge.
+
+## Lecciones aprendidas
+
+- **Validar la salida, no solo la entrada.** `safeNext` comparaba el origen, pero la normalización de dot-segments ocurre en el mismo paso que la resolución. `pathname` puede terminar en `//host` aunque el origen no cambie. Una función de saneamiento tiene que ser idempotente: si `f(f(x)) !== f(x)`, la salida todavía no es segura.
+- **La anti-enumeración depende del flujo completo, no solo del mensaje de error.** Ocultar `user_already_exists` no alcanzaba: con autoconfirm, un alta nueva iniciaba sesión y redirigía, y un correo existente no. Hay que comparar todas las respuestas observables (redirect, sesión, aviso, tiempo), no solo el texto.
+- **`auth_logs` distingue la configuración del código.** El `200 user_repeated_signup` en lugar del `422` probó que la respuesta neutral la daba Supabase y no la rama de respaldo, que en la UI se veían iguales.
+- **`server-only` se prueba rompiéndolo.** Un Client Component temporal que lo importa demuestra en un build que la protección funciona. Sin esa prueba, solo es un import que se asume correcto.

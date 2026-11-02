@@ -9,6 +9,12 @@
 - [x] Max signup rate — 10 por IP (Supabase Auth → Rate Limits, ventana de 5 min).
 - [x] Headers de seguridad en Next.js — `next.config.ts`: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` y `Strict-Transport-Security` (sin `preload`, solo en producción).
 - [x] _(Agregado)_ Protección de rutas con `proxy.ts`: jugar (`/juegos/<id>/jugar`) requiere sesión; segunda línea en la página.
+- [x] _(Spec [17](../../specs/17-correcciones-auditoria-seguridad-v0.7.1.md), v0.7.1)_ Correcciones de la [auditoría del 2026-10-25](auditorias/2026-10-25-completo.md):
+  - `safeNext` idempotente: rechaza `//` y `/\` tras normalizar (H2).
+  - "Confirm email" activado en Supabase y registro neutral ante `user_already_exists` (H1).
+  - `/api/contact` validado, sin el error crudo de Resend (H3).
+  - `server-only` en `lib/supabase/admin.ts` y `lib/pwned-password.ts` (K10).
+  - `poweredByHeader: false` (H5).
 
 Ej. (referencia original):
 
