@@ -43,7 +43,7 @@ Los otros dos hallazgos ya eran conocidos y quedan fuera (ver **No incluye**).
    - `lib/auth-errors.ts`: sacar `|| out.startsWith("/\\")` y ajustar el comentario.
    - `app/actions/auth.ts`: reescribir el comentario de la rama `user_already_exists`.
    - Probar con el script del spec 17 (`safenext-test.ts`, en el scratchpad): las 33 verificaciones siguen OK, incluidas `"/\\evil.com"` y `"/../\\evil.com"`.
-2. **`server-only` en `lib/email.ts`:** agregar el import y correr `npm run build`.
+2. ✅ **`server-only` en `lib/email.ts`:** agregar el import y correr `npm run build`.
 3. **`/api/contact`:**
    - Un mensaje por campo en el chequeo de largo.
    - Rechazar caracteres de control en `name`.
@@ -83,3 +83,8 @@ Los otros dos hallazgos ya eran conocidos y quedan fuera (ver **No incluye**).
 - `lib/auth-errors.ts`: se sacó `|| out.startsWith("/\\")`. El comentario de `safeNext` suma una línea: alcanza con `"//"`, porque en ese punto el parser ya convirtió toda `\` del path en `/`.
 - `app/actions/auth.ts`: el comentario de la rama `user_already_exists` ahora dice que solo oculta el mensaje, que la neutralidad depende de "Confirm email" y qué pasa si se apaga.
 - Prueba: `npx tsx safenext-test.ts` (script del spec 17, en el scratchpad). Las 33 verificaciones siguen OK. Los 5 casos con `\` (`"/\\evil.com"`, `"/\\\\evil.com"`, `"/../\\evil.com"`, `"/.\\/evil.com"` y `"/./\\evil.com"`) siguen dando `"/"` sin el chequeo eliminado, lo que confirma que era código muerto.
+
+### Paso 2 — `server-only` en `lib/email.ts` (2026-11-02)
+
+- `lib/email.ts`: `import "server-only"` en la primera línea, igual que `admin.ts` y `pwned-password.ts` desde el spec 17.
+- `npm run build`: OK, 11 rutas. El único importador es `app/api/contact/route.ts` (servidor). No se repitió la prueba negativa: es el mismo mecanismo que el spec 17 ya probó rompiendo el build.
