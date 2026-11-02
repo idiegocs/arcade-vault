@@ -1,6 +1,6 @@
 # SPEC 17 — Correcciones de la auditoría de seguridad
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 
 > **Depende de:** 15-autenticacion-oauth-v0.6.0 (`safeNext`, `signUp`, `/auth/callback`), 16-endurecimiento-seguridad-rutas-v0.7.0 (headers, `referenceSecurity.md`), 03-about-contact-email (`/api/contact`)
 > **Fecha:** 2026-11-02
