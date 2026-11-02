@@ -68,6 +68,7 @@ const SAFE_NEXT_BASE = "http://arcade-vault.invalid";
  * Tampoco alcanza con el origen: los dot-segments se normalizan después de
  * resolver, y "/..//evil.com" queda en este origen con pathname "//evil.com",
  * que el navegador lee como otro host. Por eso también se revisa la salida.
+ * Alcanza con "//": en ese punto el parser ya convirtió toda "\" del path en "/".
  */
 export function safeNext(next: string | null | undefined): string {
   if (!next || !next.startsWith("/")) return "/";
@@ -75,7 +76,7 @@ export function safeNext(next: string | null | undefined): string {
     const url = new URL(next, SAFE_NEXT_BASE);
     if (url.origin !== SAFE_NEXT_BASE) return "/";
     const out = `${url.pathname}${url.search}${url.hash}`;
-    if (out.startsWith("//") || out.startsWith("/\\")) return "/";
+    if (out.startsWith("//")) return "/";
     return out;
   } catch {
     return "/";
