@@ -6,6 +6,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.7.2] - 2026-11-02
+
+Spec: [`18-ajustes-code-review-spec-17-v0.7.2`](specs/18-ajustes-code-review-spec-17-v0.7.2.md)
+
+### Changed
+
+- El formulario de contacto indica qué campo es demasiado largo (nombre, correo o mensaje) y rechaza nombres con saltos de línea o caracteres especiales.
+- El módulo que envía los correos de contacto no se puede importar desde código del navegador: el build falla.
+
 ## [0.7.1] - 2026-11-02
 
 Spec: [`17-correcciones-auditoria-seguridad-v0.7.1`](specs/17-correcciones-auditoria-seguridad-v0.7.1.md)

@@ -53,17 +53,17 @@ Los otros dos hallazgos ya eran conocidos y quedan fuera (ver **No incluye**).
      - `message` con saltos de línea → sigue pasando la validación;
      - los 9 casos del spec 17 siguen en 400.
    - No mandar correos reales.
-4. **Cierre:** `npm run lint`, `npm run build`, `package.json` 0.7.2, `CHANGELOG.md`, bitácora y lecciones.
+4. ✅ **Cierre:** `npm run lint`, `npm run build`, `package.json` 0.7.2, `CHANGELOG.md`, bitácora y lecciones.
 
 ## Criterios de aceptación
 
-- [ ] `safeNext` ya no tiene el chequeo `"/\\"`, y el script de 33 verificaciones del spec 17 sigue todo OK.
-- [ ] El comentario de la rama `user_already_exists` en `signUp` no promete neutralidad sin "Confirm email".
-- [ ] `lib/email.ts` importa `server-only`.
-- [ ] `/api/contact` con un correo de más de 254 caracteres → `400` con un mensaje que nombra el correo. El nombre y el mensaje demasiado largos también dan cada uno su propio mensaje.
-- [ ] `/api/contact` con `name` que tiene `\r`, `\n`, `\t` o `\u0000` → `400`; un `message` con saltos de línea no se rechaza por eso.
-- [ ] Los 9 casos inválidos del spec 17 siguen respondiendo `400`.
-- [ ] `npm run lint` y `npm run build` sin errores; `package.json` en 0.7.2 y entrada en `CHANGELOG.md`.
+- [x] `safeNext` ya no tiene el chequeo `"/\\"`, y el script de 33 verificaciones del spec 17 sigue todo OK.
+- [x] El comentario de la rama `user_already_exists` en `signUp` no promete neutralidad sin "Confirm email".
+- [x] `lib/email.ts` importa `server-only`.
+- [x] `/api/contact` con un correo de más de 254 caracteres → `400` con un mensaje que nombra el correo. El nombre y el mensaje demasiado largos también dan cada uno su propio mensaje.
+- [x] `/api/contact` con `name` que tiene `\r`, `\n`, `\t` o `\u0000` → `400`; un `message` con saltos de línea no se rechaza por eso.
+- [x] Los 9 casos inválidos del spec 17 siguen respondiendo `400`.
+- [x] `npm run lint` y `npm run build` sin errores; `package.json` en 0.7.2 y entrada en `CHANGELOG.md`.
 
 ## Decisiones tomadas y descartadas
 
@@ -102,3 +102,16 @@ Los otros dos hallazgos ya eran conocidos y quedan fuera (ver **No incluye**).
   - Los 9 casos del spec 17 siguen en 400.
   - `tsc --noEmit` OK.
 - **Error de prueba:** el primer intento del caso "correo largo" armó un correo de 253 caracteres, no de 255. Pasó la validación y llegó a `sendContactEmail`. Resend lo rechazó (`Invalid reply_to field`) y **no se envió ningún correo**. La ruta respondió `500 {"error":"No se pudo enviar el mensaje. Intenta de nuevo."}` y el detalle quedó solo en `console.error`. Con eso quedó probado en vivo el `500` con mensaje fijo, que en el spec 17 solo se había verificado por revisión de código. Se repitió el caso con 255 caracteres: 400 con el mensaje del correo.
+
+### Paso 4 — Cierre (2026-11-02)
+
+- `npm run lint`: sin errores. `npm run build`: OK, con 11 rutas.
+- `package.json` y `package-lock.json` en **0.7.2**. El Footer muestra `0.7.2` en el dev server.
+- `CHANGELOG.md`: entrada `[0.7.2] - 2026-11-02` con la sección Changed.
+- `referenceSecurity.md` no cambia: el spec 17 ya registró `server-only` y la validación de `/api/contact`.
+
+## Lecciones aprendidas
+
+- **Un comentario de seguridad es una afirmación, y se revisa como código.** El del spec 17 prometía una protección que el flujo no daba. El code review lo encontró porque contrastó el comentario con el comportamiento real.
+- **Las pruebas de límites necesitan medir la entrada.** El caso "correo de 255 caracteres" tenía en realidad 253, así que pasó la validación y llegó a Resend. Conviene contar el largo en la misma prueba (`wc -c`) antes de confiar en el resultado, sobre todo si el camino feliz tiene efectos externos.
+- **Antes de dejar un chequeo "por las dudas", hay que conocer el parser.** El WHATWG URL ya normaliza `\` → `/` en esquemas especiales. Un chequeo que nunca se cumple da una falsa sensación de cobertura.
