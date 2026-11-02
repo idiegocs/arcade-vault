@@ -18,8 +18,6 @@ export const PWNED_PASSWORD = "Esa contraseña apareció en filtraciones conocid
 const TRANSLATIONS: [string, string][] = [
   ["invalid login credentials", INVALID_CREDENTIALS],
   ["email not confirmed", "Confirma tu correo antes de entrar. Revisa tu bandeja de entrada."],
-  ["user already registered", "Ese correo ya tiene una cuenta. Inicia sesión."],
-  ["already been registered", "Ese correo ya tiene una cuenta. Inicia sesión."],
   ["password should be at least", "La contraseña debe tener al menos 8 caracteres."],
   // Leaked password protection (HaveIBeenPwned): "Password is known to be weak
   // and easy to guess…" — no contiene "weak password".
@@ -67,13 +65,18 @@ const SAFE_NEXT_BASE = "http://arcade-vault.invalid";
  * No alcanza con mirar el prefijo: el parser de URLs descarta tabs y saltos
  * de línea y trata "\" como "/", así que "/\t/evil.com" o "/\evil.com"
  * terminan en otro host. Se resuelve la URL y se exige que el origen no cambie.
+ * Tampoco alcanza con el origen: los dot-segments se normalizan después de
+ * resolver, y "/..//evil.com" queda en este origen con pathname "//evil.com",
+ * que el navegador lee como otro host. Por eso también se revisa la salida.
  */
 export function safeNext(next: string | null | undefined): string {
   if (!next || !next.startsWith("/")) return "/";
   try {
     const url = new URL(next, SAFE_NEXT_BASE);
     if (url.origin !== SAFE_NEXT_BASE) return "/";
-    return `${url.pathname}${url.search}${url.hash}`;
+    const out = `${url.pathname}${url.search}${url.hash}`;
+    if (out.startsWith("//") || out.startsWith("/\\")) return "/";
+    return out;
   } catch {
     return "/";
   }
