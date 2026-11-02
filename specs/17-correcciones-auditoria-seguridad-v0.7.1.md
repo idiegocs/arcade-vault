@@ -73,7 +73,7 @@ flowchart LR
 
 1. ✅ **`safeNext`** — `lib/auth-errors.ts`: chequeo de la salida normalizada. Comentario que explique por qué (dot-segments: `/..//evil.com`). Probar con un script en el scratchpad (fuera del repo) la batería del spec 15 más los 6 casos de la auditoría: `"/..//evil.com"`, `"/.//evil.com"`, `"/../\\evil.com"`, `"/a/..//evil.com"`, `"/%2e%2e//evil.com"`, `"/.\\/evil.com"` → todos `"/"`; los destinos internos (`/juegos/caida`, `/juegos/caida/jugar?x=1#y`) se conservan; idempotencia en todos.
 2. ✅ **Registro neutral** — dashboard: activar "Confirm email" (lo hace el usuario; se documenta fecha y valor). Código: rama `user_already_exists` en `signUp` y quitar las 2 traducciones. Probar: registro con correo nuevo y con uno existente muestran el mismo aviso "REVISA TU CORREO"; el correo de confirmación llega y, abierto en el mismo navegador, inicia sesión.
-3. **`/api/contact`** — mover `EMAIL_RE` a `lib/validation.ts` (lo importan `app/actions/auth.ts` y la ruta) y aplicar la validación. Probar con `curl`: `{bad` → 400, `{}` → 400, `{"name":1,...}` → 400, email inválido → 400, `message` de 5001 caracteres → 400. Sin enviar correos reales salvo una prueba final desde `/about`.
+3. ✅ **`/api/contact`** — mover `EMAIL_RE` a `lib/validation.ts` (lo importan `app/actions/auth.ts` y la ruta) y aplicar la validación. Probar con `curl`: `{bad` → 400, `{}` → 400, `{"name":1,...}` → 400, email inválido → 400, `message` de 5001 caracteres → 400. Sin enviar correos reales salvo una prueba final desde `/about`.
 4. **`server-only` + `poweredByHeader`** — instalar, importar y desactivar el header. Probar: `npm run build` sin errores; `curl -sI /` sin `X-Powered-By`; un import temporal de `admin.ts` desde un `"use client"` rompe el build (se revierte).
 5. **Cierre** — `npm run lint`, `npm run build`, `referenceSecurity.md`, `package.json` 0.7.1, `CHANGELOG.md`, bitácora y lecciones en este spec. Opcional: `@security-guardian diff` sobre la rama.
 
@@ -123,3 +123,18 @@ flowchart LR
   - En `auth_logs`, `POST /signup` respondió **`200`** con `action: user_repeated_signup`. La auditoría había visto `422 user_already_exists`. Es decir, el aviso neutral lo da Supabase, no solo la rama de respaldo.
   - No se creó ningún perfil `sg17_probe`.
 - **Pendiente del usuario:** registro con un correo nuevo real. El correo de confirmación debe llegar y, abierto en el mismo navegador, iniciar sesión. Se necesita una bandeja real, así que no se automatizó.
+
+### Paso 3 — `/api/contact` validado (2026-11-02)
+
+- `lib/validation.ts` (nuevo): `EMAIL_RE`, que antes vivía en `app/actions/auth.ts`. Ahora lo importan `app/actions/auth.ts` y la ruta.
+- `app/api/contact/route.ts`:
+  - `request.json()` va dentro de `try`; si falla, responde `400`.
+  - Exige que los tres campos sean `string`, los recorta y rechaza los vacíos.
+  - Largos máximos (`MAX_LENGTH`): 100 para el nombre, 254 para el correo y 5000 para el mensaje.
+  - Valida el correo con `EMAIL_RE`.
+  - En el `catch`, el error queda en `console.error` y la respuesta es un `500` con mensaje fijo.
+  - A `sendContactEmail` le llegan los valores ya recortados.
+- **Prueba con `curl`:** 9 casos inválidos, todos `400` con mensaje en español. Son JSON inválido, `{}`, `null`, `name` numérico, `message` objeto, campos de solo espacios, correo inválido, `name` de 101 caracteres y `message` de 5001.
+- **Prueba con Playwright** desde `/about`: un mensaje válido devolvió `200 {"ok":true}` y llegó a `CONTACT_EMAIL`. Captura: `.playwright-screenshot/spec17-contacto-ok.png`.
+- **No se probó en vivo** el `500` por una falla de Resend, porque haría falta romper `RESEND_API_KEY`. Está verificado por revisión de código: el `catch` ya no lee `error.message`.
+- El formulario de `/about` sigue mostrando `data.error`. Ahora siempre es un texto propio en español.

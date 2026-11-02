@@ -14,6 +14,7 @@ import {
 import { isPwnedPassword } from "@/lib/pwned-password";
 import { isRecoverySession } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { EMAIL_RE } from "@/lib/validation";
 
 export type AuthFormState =
   { error: string } | { notice: "check-email" | "reset-sent" } | undefined;
@@ -25,7 +26,6 @@ async function callbackUrl(next: string): Promise<string> {
 }
 
 const USERNAME_RE = /^[a-z0-9_]{3,16}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 
 export async function signUp(
