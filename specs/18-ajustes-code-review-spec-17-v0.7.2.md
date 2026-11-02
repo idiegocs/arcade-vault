@@ -44,7 +44,7 @@ Los otros dos hallazgos ya eran conocidos y quedan fuera (ver **No incluye**).
    - `app/actions/auth.ts`: reescribir el comentario de la rama `user_already_exists`.
    - Probar con el script del spec 17 (`safenext-test.ts`, en el scratchpad): las 33 verificaciones siguen OK, incluidas `"/\\evil.com"` y `"/../\\evil.com"`.
 2. ✅ **`server-only` en `lib/email.ts`:** agregar el import y correr `npm run build`.
-3. **`/api/contact`:**
+3. ✅ **`/api/contact`:**
    - Un mensaje por campo en el chequeo de largo.
    - Rechazar caracteres de control en `name`.
    - Probar con `curl`:
@@ -88,3 +88,17 @@ Los otros dos hallazgos ya eran conocidos y quedan fuera (ver **No incluye**).
 
 - `lib/email.ts`: `import "server-only"` en la primera línea, igual que `admin.ts` y `pwned-password.ts` desde el spec 17.
 - `npm run build`: OK, 11 rutas. El único importador es `app/api/contact/route.ts` (servidor). No se repitió la prueba negativa: es el mismo mecanismo que el spec 17 ya probó rompiendo el build.
+
+### Paso 3 — `/api/contact` (2026-11-02)
+
+- `app/api/contact/route.ts`:
+  - El chequeo de largo se separó en tres, con mensajes propios: "El nombre puede tener hasta 100 caracteres.", "El correo puede tener hasta 254 caracteres." y "El mensaje puede tener hasta 5000 caracteres.".
+  - `CONTROL_CHARS_RE = /[\u0000-\u001F\u007F]/` sobre `name` → 400 "El nombre no puede tener saltos de línea ni caracteres especiales.". Lleva `eslint-disable-next-line no-control-regex` con su motivo.
+  - `message` no se revisa con esa regex.
+- **Prueba con `curl`:**
+  - Correo de 255 caracteres, nombre de 101 y mensaje de 5001 → 400, cada uno con su mensaje.
+  - `name` con `\r\n` (`"a\r\nBcc: x@y.com"`), `\t`, `\u0000` y `\u007f` → 400.
+  - `message` con `\n` y un correo inválido → 400 por el correo, es decir que el mensaje pasó sus validaciones.
+  - Los 9 casos del spec 17 siguen en 400.
+  - `tsc --noEmit` OK.
+- **Error de prueba:** el primer intento del caso "correo largo" armó un correo de 253 caracteres, no de 255. Pasó la validación y llegó a `sendContactEmail`. Resend lo rechazó (`Invalid reply_to field`) y **no se envió ningún correo**. La ruta respondió `500 {"error":"No se pudo enviar el mensaje. Intenta de nuevo."}` y el detalle quedó solo en `console.error`. Con eso quedó probado en vivo el `500` con mensaje fijo, que en el spec 17 solo se había verificado por revisión de código. Se repitió el caso con 255 caracteres: 400 con el mensaje del correo.
