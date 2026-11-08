@@ -186,7 +186,7 @@ Con pausa para commit al final de cada paso.
 
 1. ✅ **Baseline.** Volcar el DDL completo de dev (solo lectura) y escribir `db/migrations/0000_baseline.sql` (idempotente: `create table if not exists`, `create or replace function`, `drop policy if exists` + `create policy`, `drop trigger if exists` + `create trigger`, `create index if not exists`, revokes/grants explícitos). Diff contra `sql/001–007` y `politicas-rls.md`. Mover `sql/` a `sql/legacy/` con un README.
 2. ✅ **Seed y verificación.** `db/seeds/shared/games.sql`, generado desde las filas de dev. Chequeo de que cada id de `components/games/registry.ts` esté en el seed. `db/verify/post-deploy.sql` con salida ordenada y comparable.
-3. **Ambientes.** `db/environments/{dev,prod}` con README, `auth-config.md` (las checklists del spec 15 por ambiente) y `.env.example`. `db/README.md`.
+3. ✅ **Ambientes.** `db/environments/{dev,prod}` con README, `auth-config.md` (las checklists del spec 15 por ambiente) y `.env.example`. `db/README.md`.
 4. **Código.** `lib/env.ts`, `lib/env.public.ts`, refactor de los 4 consumidores, `callbackUrl`, `RESEND_FROM` y `.gitignore`.
 5. **Release.** `scripts/build-prod-release.mjs` + `npm run db:release`. Primer bundle `db/environments/prod/releases/2026-11-xx_v0.8.0.sql` (ledger + baseline + games). Registrar el ledger en dev (`ops.migration_log` con `0000_baseline`).
 6. **Despliegue en prod (usuario).** Pegar el bundle en el SQL Editor de prod, correr `verify/post-deploy.sql`, completar `prod/auth-config.md` y anotar en `applied.md`.
@@ -242,7 +242,18 @@ Con pausa para commit al final de cada paso.
 - **`db/verify/post-deploy.sql`:** es una sola consulta (el SQL Editor solo muestra el resultado de la última sentencia) y es de solo lectura. La primera fila es la **huella**: el md5 de columnas, constraints, índices, RLS, políticas, md5 de las funciones, `EXECUTE`, triggers, el catálogo y el ledger. La sección `datos_ambiente` (conteos de `auth.users`, `profiles` y `scores`) queda fuera de la huella. El ledger se lee con `query_to_xml` detrás de `to_regclass`, así la consulta no falla si `ops.migration_log` todavía no existe.
 - **Huella de dev hoy:** `1e354b4463c99a89623c1d267a667b46`, sin ledger. En dev hay 4 usuarios, 4 perfiles y 35 scores.
 - **Corrección de la baseline:** el paso 1 tenía los cuerpos de las funciones en minúscula. Postgres guarda `prosrc` tal cual, así que el md5 habría cambiado al aplicarla, aunque la función hiciera lo mismo. Ahora son copia literal de dev: `md5(prosrc)` coincide (`handle_new_user` `2b3bb3a7…`, `email_for_username` `07692672…`).
-- **`.gitattributes`:** `*.sql text eol=lf`, porque con `core.autocrlf=true` un `` dentro del cuerpo de una función rompería la huella entre ambientes. El script de release igual normaliza a LF (paso 5).
+- **`.gitattributes`:** `*.sql text eol=lf`, porque con `core.autocrlf=true` un `
+` dentro del cuerpo de una función rompería la huella entre ambientes. El script de release igual normaliza a LF (paso 5).
+
+### Paso 3 — Ambientes (2026-11-08)
+
+- **`db/environments/dev/`:** `README.md` (ref, URL, cómo se aplica por MCP y cómo se registra en el ledger), `auth-config.md` (valores actuales del dashboard, de los specs 15, 16 y 17), `.env.example` con los valores no secretos de dev y `seeds/` vacío (`.gitkeep`).
+- **`db/environments/prod/`:** `README.md` (reglas: solo SQL Editor y ningún agente; el paso a paso del release; primero la base y después la app), `auth-config.md` como **checklist** (Site URL y redirects del dominio, Confirm email, contraseñas, **SMTP propio** y **apps OAuth nuevas** de prod), `.env.example` y `releases/applied.md`.
+- **`db/README.md`:** el manual operativo, con la tabla de ambientes, qué hay en cada carpeta, las reglas para escribir SQL, el flujo dev → prod (Mermaid + pasos) y el ledger.
+- **`.env.example`** en la raíz, solo con los nombres de las variables. En `.gitignore` se agregó `!.env.example` y `!db/environments/*/.env.example`. `git check-ignore` confirma que `.env.local` y `.env.development.local` siguen ignorados y que las plantillas se versionan.
+- **Datos de prod que faltan** (`<ref-prod>`, `<dominio>`): son placeholders porque el ref de prod no está en el repo. Los completa el usuario.
+- **Variable de ambiente:** `NEXT_PUBLIC_APP_ENV` dice en qué ambiente está la app. No se usa `NODE_ENV` porque un `next build` local vale `production` aunque lea variables de dev. Se documentó en `db/README.md` ("Cómo sabe la app en qué ambiente está").
+- **Hallazgo:** "Confirm email" está activo en dev desde el spec 17, y en prod tiene que estarlo antes del primer registro. El SMTP por defecto de Supabase no sirve para usuarios reales: está en la checklist de prod.
 
 ## Lecciones aprendidas
 
