@@ -45,7 +45,8 @@ Lleva el prefijo `NEXT_PUBLIC_` porque la leen el proxy y el navegador, así que
 4. **Cuerpos de función con `$fn$`.** Nunca `$$` ni `$mig$`: `$mig$` lo usa el release y el script lo rechaza.
 5. **Seeds = upsert** (`insert … on conflict (id) do update`) y nunca borran.
 6. **Seguridad:** todo cambio de RLS, políticas, `SECURITY DEFINER` o grants se refleja en [`references/security-checklist/politicas-rls.md`](../references/security-checklist/politicas-rls.md).
-7. Los `.sql` van con **LF** (`.gitattributes`): la huella compara el texto de las funciones.
+7. **Nada de `select` suelto en una migración:** el release la ejecuta dentro de un bloque `do` (plpgsql). Para llamar una función se usa `perform f();`.
+8. Los `.sql` van con **LF** (`.gitattributes`): la huella compara el texto de las funciones.
 
 ## Flujo dev → prod
 

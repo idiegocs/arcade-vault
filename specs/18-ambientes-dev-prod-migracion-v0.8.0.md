@@ -188,7 +188,7 @@ Con pausa para commit al final de cada paso.
 2. ✅ **Seed y verificación.** `db/seeds/shared/games.sql`, generado desde las filas de dev. Chequeo de que cada id de `components/games/registry.ts` esté en el seed. `db/verify/post-deploy.sql` con salida ordenada y comparable.
 3. ✅ **Ambientes.** `db/environments/{dev,prod}` con README, `auth-config.md` (las checklists del spec 15 por ambiente) y `.env.example`. `db/README.md`.
 4. ✅ **Código.** `lib/env.ts`, `lib/env.public.ts`, refactor de los 4 consumidores, `callbackUrl`, `RESEND_FROM` y `.gitignore`.
-5. **Release.** `scripts/build-prod-release.mjs` + `npm run db:release`. Primer bundle `db/environments/prod/releases/2026-11-xx_v0.8.0.sql` (ledger + baseline + games). Registrar el ledger en dev (`ops.migration_log` con `0000_baseline`).
+5. ✅ **Release.** `scripts/build-prod-release.mjs` + `npm run db:release`. Primer bundle `db/environments/prod/releases/2026-11-xx_v0.8.0.sql` (ledger + baseline + games). Registrar el ledger en dev (`ops.migration_log` con `0000_baseline`).
 6. **Despliegue en prod (usuario).** Pegar el bundle en el SQL Editor de prod, correr `verify/post-deploy.sql`, completar `prod/auth-config.md` y anotar en `applied.md`.
 7. **Cierre.** `CLAUDE.md` (una línea + link a `db/README.md`), `/add-game-impl` y `politicas-rls.md` apuntando a `db/`, `package.json` 0.8.0 y `CHANGELOG.md`.
 
@@ -272,6 +272,28 @@ Con pausa para commit al final de cada paso.
   - Build completo con las variables de dev en `process.env` → 11 rutas, exit 0. `.next/static` no contiene `sb_secret_`, `SUPABASE_DEV_PROJECT_REF` ni `RESEND_API_KEY`.
   - `npm run dev`: `/`, `/games`, `/salon-de-la-fama`, `/auth` y `/juegos/rocas` responden 200. `/games` lista el catálogo de dev. `/juegos/rocas/jugar` sin sesión → 307 a `/auth?next=…`, o sea que el proxy lee las variables.
 - **Pendiente para el smoke test de prod:** que el link del mail de registro o de recuperación use el dominio de prod. No se probó en dev porque manda un correo real.
+
+### Paso 5 — Release (2026-11-08)
+
+- **`scripts/build-prod-release.mjs`** + `npm run db:release` (`--from <versión>`, `--stdout`, `--force`):
+  - Normaliza los `.sql` a LF y calcula el sha256 de cada migración.
+  - Valida: nombres `NNNN_slug.sql` sin números repetidos; nada de `$mig$` ni `begin/commit/rollback` en el código (los comentarios se ignoran); **checksum fijo** (si una migración cambió después de publicarse, falla; los checksums publicados se leen de los headers `-- migración: <v> sha256: <x>` de los releases anteriores); todo id de `registry.ts` presente en el seed.
+  - El bundle tiene `begin` → ledger (`ops` con `revoke` a `public/anon/authenticated`) → un `do $mig$` por migración pendiente que hace `return` si la versión ya está en el ledger → seeds compartidos → `commit`.
+- **`package.json` → 0.8.0** en este paso, para que el primer release se llame `…_v0.8.0.sql`. El `CHANGELOG` se hace en el paso 7.
+- **Primer release:** `db/environments/prod/releases/2026-11-08_v0.8.0.sql` (ledger + `0000_baseline` sha256 `42e1316f…` + `games.sql`). Es idéntico a la salida de `--stdout`.
+- **Aplicado en dev** (el mismo contenido del bundle, sin los comentarios, por `execute_sql`):
+  - huella **sin ledger** `1e354b44…` antes y después → **la baseline no cambió nada en dev** ✅;
+  - ledger `0000_baseline 42e1316f…`; 8 juegos con el mismo `created_at`; 35 scores y 4 perfiles, sin cambios;
+  - `anon` y `authenticated` sin `USAGE` sobre `ops`.
+- **Segunda pasada** (idempotencia): el `do $mig$` se salteó (una trampa `raise exception` después del `return` no se disparó). Siguen quedando 1 fila en el ledger y 8 juegos ✅.
+- **`get_advisors` security:** solo `auth_leaked_password_protection`, que ya se conocía (plan Free, spec 16). Ninguno nuevo ✅.
+- **Huella esperada para prod: `f6c204ba1abb83f58be5f6e3bcf2e7ea`** (dev con ledger). Quedó anotada en `releases/applied.md`.
+- **Bug encontrado en `post-deploy.sql`:** en las filas que devuelve `xpath('/table/row', …)`, la ruta relativa `version/text()` devuelve `null` y hay que usar `/row/version/text()`. Además, `seccion || '|' || objeto` con `objeto` null daba null y `string_agg` **descartaba la fila sin avisar**: el ledger no entraba en la huella. Corregido (rutas absolutas + `coalesce(objeto, '?')`).
+- **Pruebas negativas del script:**
+  - `--from 9999_nada` → "no existe";
+  - generar dos veces → "ya existe, usar --force";
+  - agregar una línea a la baseline → "cambió después de publicarse… crear una nueva" (la baseline se restauró).
+- **Regla nueva para migraciones:** van dentro de un bloque plpgsql, así que un `select` suelto falla ("query has no destination"). Hay que usar `perform`. Queda documentado en `db/README.md`.
 
 ## Lecciones aprendidas
 

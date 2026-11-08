@@ -66,15 +66,16 @@ with checks(seccion, objeto, detalle) as (
 
   union all -- Ledger (si existe): versión + checksum, sin fecha
   select 'ledger',
-         (xpath('version/text()', r))[1]::text,
-         (xpath('checksum/text()', r))[1]::text
+         (xpath('/row/version/text()', r))[1]::text,
+         (xpath('/row/checksum/text()', r))[1]::text
   from unnest(xpath('/table/row',
          case when to_regclass('ops.migration_log') is null then '<table/>'::xml
               else query_to_xml('select version, checksum from ops.migration_log', false, false, '')
          end)) as r
 ),
 huella as (
-  select md5(string_agg(seccion || '|' || objeto || '|' || coalesce(detalle, ''),
+  -- coalesce en objeto y detalle: un null no puede esconder una fila de la huella.
+  select md5(string_agg(seccion || '|' || coalesce(objeto, '?') || '|' || coalesce(detalle, ''),
                         E'\n' order by seccion, objeto)) as md5
   from checks
 ),
