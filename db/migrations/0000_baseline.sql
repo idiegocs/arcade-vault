@@ -8,6 +8,8 @@
 --   * Idempotente: aplicarlo sobre una base que ya está en este estado no cambia nada.
 --   * Sin `begin`/`commit`: el bundle de release lo envuelve en una transacción.
 --   * Cuerpos de función con `$fn$`, nunca `$$` ni `$mig$` (los usa el bundle).
+--   * Los cuerpos de función son copia LITERAL de dev: Postgres guarda el texto
+--     tal cual y db/verify/post-deploy.sql compara su md5.
 --
 -- Los grants de tabla a anon/authenticated/service_role no se declaran: son los
 -- default privileges de Supabase y se crean solos al crear la tabla. Lo que
@@ -99,17 +101,17 @@ create or replace function public.handle_new_user()
   security definer
   set search_path to 'public'
 as $fn$
-declare
+DECLARE
   base text;
   candidate text;
   n int := 0;
-begin
+BEGIN
   candidate := lower(new.raw_user_meta_data->>'username');
-  if candidate ~ '^[a-z0-9_]{3,16}$'
-     and not exists (select 1 from profiles where username = candidate) then
-    insert into profiles (id, username) values (new.id, candidate);
-    return new;
-  end if;
+  IF candidate ~ '^[a-z0-9_]{3,16}$'
+     AND NOT EXISTS (SELECT 1 FROM profiles WHERE username = candidate) THEN
+    INSERT INTO profiles (id, username) VALUES (new.id, candidate);
+    RETURN new;
+  END IF;
 
   base := coalesce(
     new.raw_user_meta_data->>'username',
@@ -118,19 +120,19 @@ begin
     ''
   );
   base := left(regexp_replace(lower(base), '[^a-z0-9_]', '', 'g'), 12);
-  if length(base) < 3 then
+  IF length(base) < 3 THEN
     base := 'jugador';
-  end if;
+  END IF;
 
   candidate := base;
-  while exists (select 1 from profiles where username = candidate) loop
+  WHILE EXISTS (SELECT 1 FROM profiles WHERE username = candidate) LOOP
     n := n + 1;
     candidate := base || n;
-  end loop;
+  END LOOP;
 
-  insert into profiles (id, username) values (new.id, candidate);
-  return new;
-end;
+  INSERT INTO profiles (id, username) VALUES (new.id, candidate);
+  RETURN new;
+END;
 $fn$;
 
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
@@ -143,10 +145,10 @@ create or replace function public.email_for_username(p_username text)
   security definer
   set search_path to 'public', 'auth'
 as $fn$
-  select u.email
-  from auth.users u
-  join profiles p on p.id = u.id
-  where p.username = lower(p_username);
+  SELECT u.email
+  FROM auth.users u
+  JOIN profiles p ON p.id = u.id
+  WHERE p.username = lower(p_username);
 $fn$;
 
 revoke execute on function public.email_for_username(text) from public, anon, authenticated;

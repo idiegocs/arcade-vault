@@ -185,7 +185,7 @@ commit;
 Con pausa para commit al final de cada paso.
 
 1. ✅ **Baseline.** Volcar el DDL completo de dev (solo lectura) y escribir `db/migrations/0000_baseline.sql` (idempotente: `create table if not exists`, `create or replace function`, `drop policy if exists` + `create policy`, `drop trigger if exists` + `create trigger`, `create index if not exists`, revokes/grants explícitos). Diff contra `sql/001–007` y `politicas-rls.md`. Mover `sql/` a `sql/legacy/` con un README.
-2. **Seed y verificación.** `db/seeds/shared/games.sql`, generado desde las filas de dev. Chequeo de que cada id de `components/games/registry.ts` esté en el seed. `db/verify/post-deploy.sql` con salida ordenada y comparable.
+2. ✅ **Seed y verificación.** `db/seeds/shared/games.sql`, generado desde las filas de dev. Chequeo de que cada id de `components/games/registry.ts` esté en el seed. `db/verify/post-deploy.sql` con salida ordenada y comparable.
 3. **Ambientes.** `db/environments/{dev,prod}` con README, `auth-config.md` (las checklists del spec 15 por ambiente) y `.env.example`. `db/README.md`.
 4. **Código.** `lib/env.ts`, `lib/env.public.ts`, refactor de los 4 consumidores, `callbackUrl`, `RESEND_FROM` y `.gitignore`.
 5. **Release.** `scripts/build-prod-release.mjs` + `npm run db:release`. Primer bundle `db/environments/prod/releases/2026-11-xx_v0.8.0.sql` (ledger + baseline + games). Registrar el ledger en dev (`ops.migration_log` con `0000_baseline`).
@@ -234,6 +234,15 @@ Con pausa para commit al final de cada paso.
 - **Extensiones** (`pgcrypto`, `uuid-ossp`, `pg_stat_statements`, `supabase_vault`): vienen por defecto en todo proyecto Supabase. La baseline no las usa (`scores.id` es identity, `profiles.id` viene de `auth.users`).
 - `sql/001–007` → `sql/legacy/` (`git mv`) + `sql/README.md`. Los specs viejos y las auditorías siguen citando `sql/00N`: son históricos y no se tocan. Los docs vivos se actualizan en el paso 7.
 - La baseline todavía no se aplicó en dev: se valida en el paso 5, junto con el ledger.
+
+### Paso 2 — Seed y verificación (2026-11-08)
+
+- **`db/seeds/shared/games.sql`:** las 8 filas de dev, upsert por `id` que no toca `created_at` y nunca borra (`scores.game_id` tiene FK). Incluye los 5 ids de `registry.ts` (`rocas`, `caida`, `bloque-buster`, `serpentina`, `ranaria`) y 3 juegos de catálogo sin motor (`gloton`, `invasores`, `duelo-pixel`).
+- **Seed = dev:** un `VALUES` del seed contra `public.games` con `EXCEPT` en los dos sentidos da 0 filas.
+- **`db/verify/post-deploy.sql`:** es una sola consulta (el SQL Editor solo muestra el resultado de la última sentencia) y es de solo lectura. La primera fila es la **huella**: el md5 de columnas, constraints, índices, RLS, políticas, md5 de las funciones, `EXECUTE`, triggers, el catálogo y el ledger. La sección `datos_ambiente` (conteos de `auth.users`, `profiles` y `scores`) queda fuera de la huella. El ledger se lee con `query_to_xml` detrás de `to_regclass`, así la consulta no falla si `ops.migration_log` todavía no existe.
+- **Huella de dev hoy:** `1e354b4463c99a89623c1d267a667b46`, sin ledger. En dev hay 4 usuarios, 4 perfiles y 35 scores.
+- **Corrección de la baseline:** el paso 1 tenía los cuerpos de las funciones en minúscula. Postgres guarda `prosrc` tal cual, así que el md5 habría cambiado al aplicarla, aunque la función hiciera lo mismo. Ahora son copia literal de dev: `md5(prosrc)` coincide (`handle_new_user` `2b3bb3a7…`, `email_for_username` `07692672…`).
+- **`.gitattributes`:** `*.sql text eol=lf`, porque con `core.autocrlf=true` un `` dentro del cuerpo de una función rompería la huella entre ambientes. El script de release igual normaliza a LF (paso 5).
 
 ## Lecciones aprendidas
 
