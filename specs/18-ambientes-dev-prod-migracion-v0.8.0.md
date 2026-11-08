@@ -187,7 +187,7 @@ Con pausa para commit al final de cada paso.
 1. ✅ **Baseline.** Volcar el DDL completo de dev (solo lectura) y escribir `db/migrations/0000_baseline.sql` (idempotente: `create table if not exists`, `create or replace function`, `drop policy if exists` + `create policy`, `drop trigger if exists` + `create trigger`, `create index if not exists`, revokes/grants explícitos). Diff contra `sql/001–007` y `politicas-rls.md`. Mover `sql/` a `sql/legacy/` con un README.
 2. ✅ **Seed y verificación.** `db/seeds/shared/games.sql`, generado desde las filas de dev. Chequeo de que cada id de `components/games/registry.ts` esté en el seed. `db/verify/post-deploy.sql` con salida ordenada y comparable.
 3. ✅ **Ambientes.** `db/environments/{dev,prod}` con README, `auth-config.md` (las checklists del spec 15 por ambiente) y `.env.example`. `db/README.md`.
-4. **Código.** `lib/env.ts`, `lib/env.public.ts`, refactor de los 4 consumidores, `callbackUrl`, `RESEND_FROM` y `.gitignore`.
+4. ✅ **Código.** `lib/env.ts`, `lib/env.public.ts`, refactor de los 4 consumidores, `callbackUrl`, `RESEND_FROM` y `.gitignore`.
 5. **Release.** `scripts/build-prod-release.mjs` + `npm run db:release`. Primer bundle `db/environments/prod/releases/2026-11-xx_v0.8.0.sql` (ledger + baseline + games). Registrar el ledger en dev (`ops.migration_log` con `0000_baseline`).
 6. **Despliegue en prod (usuario).** Pegar el bundle en el SQL Editor de prod, correr `verify/post-deploy.sql`, completar `prod/auth-config.md` y anotar en `applied.md`.
 7. **Cierre.** `CLAUDE.md` (una línea + link a `db/README.md`), `/add-game-impl` y `politicas-rls.md` apuntando a `db/`, `package.json` 0.8.0 y `CHANGELOG.md`.
@@ -254,6 +254,24 @@ Con pausa para commit al final de cada paso.
 - **Datos de prod que faltan** (`<ref-prod>`, `<dominio>`): son placeholders porque el ref de prod no está en el repo. Los completa el usuario.
 - **Variable de ambiente:** `NEXT_PUBLIC_APP_ENV` dice en qué ambiente está la app. No se usa `NODE_ENV` porque un `next build` local vale `production` aunque lea variables de dev. Se documentó en `db/README.md` ("Cómo sabe la app en qué ambiente está").
 - **Hallazgo:** "Confirm email" está activo en dev desde el spec 17, y en prod tiene que estarlo antes del primer registro. El SMTP por defecto de Supabase no sirve para usuarios reales: está en la checklist de prod.
+
+### Paso 4 — Código (2026-11-08)
+
+- **`lib/env.public.ts`** (sin `server-only`): `publicEnv()` valida `NEXT_PUBLIC_APP_ENV` (`development`|`production`), `NEXT_PUBLIC_SITE_URL` (sin `/` final), `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Las lecturas son `process.env.NEXT_PUBLIC_X` literales para que Next las inlinee. La **guarda** corre solo en el servidor (`typeof window === "undefined"`): con `production`, `SUPABASE_DEV_PROJECT_REF` es obligatoria y la URL no puede contenerlo. La lógica quedó en `env.public.ts` y no en `env.ts` porque el proxy y `next.config.ts` también la necesitan, y no pueden importar `server-only`.
+- **`lib/env.ts`** (`server-only`): `supabaseAdminEnv()` y `contactEmailEnv()`. Cada getter valida solo lo suyo: si falta Resend, el login sigue funcionando.
+- **`next.config.ts`** llama a `publicEnv()` al cargarse, así que `next dev`, `next build` y `next start` cortan antes de compilar. Verificado en `node_modules/next/dist/server/config.js`: `loadEnvConfig` corre antes de importar el config, así que los `.env.*` ya están cargados.
+- **Consumidores:** `lib/supabase/server.ts`, `lib/supabase/admin.ts`, `lib/proxy/session.ts` y `lib/email.ts` (remitente `Arcade Vault <RESEND_FROM>`). Se eliminaron los mensajes "Faltan … en .env.local".
+- **`callbackUrl`** (`app/actions/auth.ts`): base `NEXT_PUBLIC_SITE_URL`. El `origin` de la request solo se usa con `appEnv === "development"`. Se eliminó el fallback fijo a `localhost:3000`.
+- **`.env.local` → `.env.development.local`**, con 4 variables nuevas (`NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_SITE_URL`, `SUPABASE_DEV_PROJECT_REF`, `RESEND_FROM`). El resto del archivo no se leyó ni se modificó. `next dev` muestra `Environments: .env.development.local`.
+- **Verificación:**
+  - `npx tsc --noEmit` y `eslint` en verde.
+  - `npm run build` sin variables → `Faltan variables de entorno: NEXT_PUBLIC_APP_ENV, …` (exit 1).
+  - `production` + URL de dev → `… apunta al proyecto de dev (fumwaikjxwrhnuyofdxq)`.
+  - `production` sin `SUPABASE_DEV_PROJECT_REF` → `Falta SUPABASE_DEV_PROJECT_REF…`.
+  - `NEXT_PUBLIC_APP_ENV=prod` → `no es válido`.
+  - Build completo con las variables de dev en `process.env` → 11 rutas, exit 0. `.next/static` no contiene `sb_secret_`, `SUPABASE_DEV_PROJECT_REF` ni `RESEND_API_KEY`.
+  - `npm run dev`: `/`, `/games`, `/salon-de-la-fama`, `/auth` y `/juegos/rocas` responden 200. `/games` lista el catálogo de dev. `/juegos/rocas/jugar` sin sesión → 307 a `/auth?next=…`, o sea que el proxy lee las variables.
+- **Pendiente para el smoke test de prod:** que el link del mail de registro o de recuperación use el dominio de prod. No se probó en dev porque manda un correo real.
 
 ## Lecciones aprendidas
 

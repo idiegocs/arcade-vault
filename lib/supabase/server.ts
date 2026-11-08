@@ -1,23 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { publicEnv } from "@/lib/env.public";
 
 /**
  * Cliente de Supabase para Server Components, Server Actions y Route Handlers.
  * Lee/escribe la sesión desde las cookies de la request actual.
  */
 export async function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-  if (!url || !publishableKey) {
-    throw new Error(
-      "Faltan NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY en .env.local"
-    );
-  }
+  const { supabaseUrl, supabasePublishableKey } = publicEnv();
 
   const cookieStore = await cookies();
 
-  return createServerClient(url, publishableKey, {
+  return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

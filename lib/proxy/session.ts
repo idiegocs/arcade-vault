@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { publicEnv } from "@/lib/env.public";
 
 /**
  * Refresca la sesión de Supabase (cookies) en cada request y devuelve el
@@ -12,16 +13,9 @@ export async function updateSession(
 ): Promise<{ response: NextResponse; user: User | null }> {
   let response = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { supabaseUrl, supabasePublishableKey } = publicEnv();
 
-  if (!url || !publishableKey) {
-    throw new Error(
-      "Faltan NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY en .env.local"
-    );
-  }
-
-  const supabase = createServerClient(url, publishableKey, {
+  const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();

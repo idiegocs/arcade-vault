@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { publicEnv } from "@/lib/env.public";
 import { createClient } from "@/lib/supabase/server";
 import {
   AUTH_UNAVAILABLE,
@@ -19,10 +20,16 @@ import { EMAIL_RE } from "@/lib/validation";
 export type AuthFormState =
   { error: string } | { notice: "check-email" | "reset-sent" } | undefined;
 
-/** URL de /auth/callback para los enlaces que manda Supabase, con el destino final en `next`. */
+/**
+ * URL de /auth/callback para los enlaces que manda Supabase, con el destino final en `next`.
+ * La base es `NEXT_PUBLIC_SITE_URL`, que tiene que coincidir con las Redirect URLs del
+ * proyecto de Supabase de cada ambiente (spec 18). Solo en dev se usa el `origin` de la
+ * request, para entrar desde el celular por la IP de la red (`allowedDevOrigins`).
+ */
 async function callbackUrl(next: string): Promise<string> {
-  const origin = (await headers()).get("origin") ?? "http://localhost:3000";
-  return `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+  const { appEnv, siteUrl } = publicEnv();
+  const origin = appEnv === "development" ? (await headers()).get("origin") : null;
+  return `${origin ?? siteUrl}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
 const USERNAME_RE = /^[a-z0-9_]{3,16}$/;
