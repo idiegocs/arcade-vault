@@ -13,6 +13,7 @@ Arcade Vault — a platform for playing games online and competing on points/lea
 Key rules:
 
 - **[`references/juegos-implementados.md`](references/juegos-implementados.md)** is the source of truth for which games have a real engine. Update it whenever a game is added to/removed from `registry.ts` or the `games` table.
+- **Environments (dev/prod):** [`db/README.md`](db/README.md). Schema changes go in `db/migrations/`, the catalog in `db/seeds/shared/games.sql` (never `sql/`, which is legacy). Apply them to **dev only** via MCP. Prod (SQL Editor only, no MCP/agents) gets them through `npm run db:release`. App env = `NEXT_PUBLIC_APP_ENV` (not `NODE_ENV`), and the vars live in `.env.development.local`.
 - **RLS:** [`references/security-checklist/politicas-rls.md`](references/security-checklist/politicas-rls.md) is the inventory of RLS policies, `SECURITY DEFINER` functions and grants. Update it whenever a migration changes any of them.
 - **Score caps:** `saveScore` (`app/actions/scores.ts`) rejects scores above the game's `maxPlausibleScore` from its `registry.ts` entry; no entry ⇒ every score rejected (fail-closed, intentional — spec 11).
 - **Per-game, not platform:** sounds (`defineSounds` from `components/games/audio.ts`), background music (spec 13), skins `clasico`/`neon`/`retro` (CAÍDA is the reference) and `touchControls` (spec 12) all live in each game's engine/registry entry. Adding a game never touches `audio.ts` or `scores.ts`.

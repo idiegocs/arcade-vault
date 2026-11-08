@@ -37,7 +37,7 @@ Solo lo necesario para elegir, no para especificar (eso lo hace cada agente):
 1. `references/juegos-implementados.md` (arriba) — qué hay en el catálogo y qué tiene motor.
 2. `references/candidatos-juegos.md` — qué ya se evaluó o descartó; no propongas algo que el usuario ya rechazó ahí, y evitá elegir un juego que sea básicamente un candidato ya evaluado con otro nombre (ej. un Pipe Mania temático cuando CAÑERÍA ya está en la bitácora). Si igual lo elegís, pasale al agente el nombre del candidato que se le parece.
 3. `.claude/agents/game-planner.md`, sección "Criterios de decisión" — los criterios para filtrar ideas.
-4. Catálogo en vivo con `mcp__supabase__execute_sql`: `select id, title, cat, cover, color, sort_order from games order by sort_order;`. Si el MCP no responde, caé a `sql/004_recreate_games_table.sql` más cualquier `sql/00N_add_game_*.sql` posterior, y avisalo.
+4. Catálogo en vivo con `mcp__supabase__execute_sql`: `select id, title, cat, cover, color, sort_order from games order by sort_order;`. Si el MCP no responde, caé a `db/seeds/shared/games.sql` (el catálogo versionado, spec 18), y avisalo.
 
 ## Fase 2 — Elegir los 3 juegos
 

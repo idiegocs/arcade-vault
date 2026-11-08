@@ -1,6 +1,6 @@
 # SPEC 18 — Ambientes dev / prod y migración de la base
 
-> **Estado:** Aprobado
+> **Estado:** Implementado (dev). Pendiente el paso 6: el primer despliegue en prod, que hace el usuario.
 
 > **Depende de:** 04-supabase-auth-scores (esquema base), 15-autenticacion-oauth-v0.6.0 (redirects y providers OAuth), 16-endurecimiento-seguridad-rutas-v0.7.0 (RLS, HIBP, `politicas-rls.md`), 17-correcciones-auditoria-seguridad-v0.7.1 (`server-only`, `safeNext`)
 > **Fecha:** 2026-11-08
@@ -190,19 +190,19 @@ Con pausa para commit al final de cada paso.
 4. ✅ **Código.** `lib/env.ts`, `lib/env.public.ts`, refactor de los 4 consumidores, `callbackUrl`, `RESEND_FROM` y `.gitignore`.
 5. ✅ **Release.** `scripts/build-prod-release.mjs` + `npm run db:release`. Primer bundle `db/environments/prod/releases/2026-11-xx_v0.8.0.sql` (ledger + baseline + games). Registrar el ledger en dev (`ops.migration_log` con `0000_baseline`).
 6. **Despliegue en prod (usuario).** Pegar el bundle en el SQL Editor de prod, correr `verify/post-deploy.sql`, completar `prod/auth-config.md` y anotar en `applied.md`.
-7. **Cierre.** `CLAUDE.md` (una línea + link a `db/README.md`), `/add-game-impl` y `politicas-rls.md` apuntando a `db/`, `package.json` 0.8.0 y `CHANGELOG.md`.
+7. ✅ **Cierre.** `CLAUDE.md` (una línea + link a `db/README.md`), `/add-game-impl` y `politicas-rls.md` apuntando a `db/`, `package.json` 0.8.0 y `CHANGELOG.md`.
 
 ## Criterios de aceptación
 
-- [ ] Aplicar `0000_baseline.sql` sobre dev no cambia nada: la salida de `verify/post-deploy.sql` es idéntica antes y después.
-- [ ] `get_advisors` (security) en dev, sin hallazgos nuevos.
-- [ ] El bundle aplicado en prod deja la salida de `verify/post-deploy.sql` igual a la de dev (filtrando el ledger por fecha).
-- [ ] Pegar el bundle por segunda vez en prod no hace nada y no da error.
-- [ ] Prod no tiene filas en `profiles` ni `scores` provenientes de dev.
-- [ ] `npm run build` sin variables falla con el mensaje de `lib/env.ts`. Con `NEXT_PUBLIC_APP_ENV=production` y la URL de dev, también falla (guarda).
-- [ ] `npm run dev` funciona con `.env.development.local`. `npx tsc --noEmit` y `npm run lint` en verde.
-- [ ] `emailRedirectTo`/`redirectTo` usan `NEXT_PUBLIC_SITE_URL`.
-- [ ] Smoke test en prod: registro (se crea `profiles`), link de confirmación al dominio de prod, login con usuario, OAuth Google/GitHub, catálogo visible, guardar un score y verlo en el ranking, score por encima del cap rechazado, formulario de contacto.
+- [x] Aplicar `0000_baseline.sql` sobre dev no cambia nada: la salida de `verify/post-deploy.sql` es idéntica antes y después. _(Huella sin ledger `1e354b44…` antes y después, paso 5.)_
+- [x] `get_advisors` (security) en dev, sin hallazgos nuevos. _(Solo `auth_leaked_password_protection`, ya conocido.)_
+- [ ] El bundle aplicado en prod deja la salida de `verify/post-deploy.sql` igual a la de dev. _(Huella esperada `f6c204ba1abb83f58be5f6e3bcf2e7ea`, pendiente del paso 6.)_
+- [ ] Pegar el bundle por segunda vez en prod no hace nada y no da error. _(Probado en dev en el paso 5; falta prod.)_
+- [ ] Prod no tiene filas en `profiles` ni `scores` provenientes de dev. _(Por construcción el bundle no las incluye; se confirma con `datos_ambiente` en prod.)_
+- [x] `npm run build` sin variables falla con el mensaje de `lib/env.public.ts`. Con `NEXT_PUBLIC_APP_ENV=production` y la URL de dev, también falla (guarda).
+- [x] `npm run dev` funciona con `.env.development.local`. `npx tsc --noEmit` y `npm run lint` en verde.
+- [x] `emailRedirectTo`/`redirectTo` usan `NEXT_PUBLIC_SITE_URL` (`callbackUrl`, revisión del código; el link real se ve en el smoke test de prod).
+- [ ] _(Paso 6, usuario)_ Smoke test en prod: registro (se crea `profiles`), link de confirmación al dominio de prod, login con usuario, OAuth Google/GitHub, catálogo visible, guardar un score y verlo en el ranking, score por encima del cap rechazado, formulario de contacto.
 
 ## Decisiones tomadas y descartadas
 
@@ -294,6 +294,20 @@ Con pausa para commit al final de cada paso.
   - generar dos veces → "ya existe, usar --force";
   - agregar una línea a la baseline → "cambió después de publicarse… crear una nueva" (la baseline se restauró).
 - **Regla nueva para migraciones:** van dentro de un bloque plpgsql, así que un `select` suelto falla ("query has no destination"). Hay que usar `perform`. Queda documentado en `db/README.md`.
+
+### Paso 7 — Cierre (2026-11-08)
+
+- **Docs vivos apuntando a `db/`:**
+  - `/add-game-impl`: el caso C agrega la fila a `db/seeds/shared/games.sql` y la aplica solo en dev con `execute_sql`.
+  - `/add-game` y su `plantilla-spec.md`, `/game-jam` y `components/games/README.md`: el fallback del catálogo ahora es el seed.
+  - `@security-guardian`: drift contra el ledger y la huella, `.env.development.local`, regla nueva **"Solo dev"**.
+  - `politicas-rls.md`: nota de consolidación en la baseline y sección del schema `ops`.
+  - `referenceSecurity.md`: ítem del spec 18.
+  - `CLAUDE.md`: una línea "Environments".
+  - Los specs viejos y las auditorías siguen citando `sql/00N`: son registro histórico.
+- **`CHANGELOG.md` [0.8.0]** (`package.json` ya estaba en 0.8.0 desde el paso 5).
+- **Verificación:** `npm run lint` (todo el repo) y `npx tsc --noEmit` en verde.
+- **CRLF:** Python en Windows escribía CRLF en la copia de trabajo de los `.sql`. El índice estaba bien por `.gitattributes`, pero se refrescaron las copias (`rm` + `git checkout`). El script de release normaliza a LF de todos modos.
 
 ## Lecciones aprendidas
 

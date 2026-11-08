@@ -3,6 +3,8 @@
 Inventario de Row Level Security del esquema `public` en Supabase. **Todo cambio de políticas, RLS, funciones `SECURITY DEFINER` o grants se refleja acá** en el mismo spec/PR que lo introduce.
 
 > **Generado:** 2026-10-25, desde la base (no a mano), después de la migración `sql/007_endurecimiento_rls.sql` — spec [16](../../specs/16-endurecimiento-seguridad-rutas-v0.7.0.md). Para regenerarlo, ver [Cómo regenerar](#cómo-regenerar).
+>
+> **Desde el spec 18 (v0.8.0):** el SQL vigente está en [`db/migrations/`](../../db/migrations/). Todo lo de este inventario está consolidado en `0000_baseline.sql`, verificado el 2026-11-08 contra la base de dev. La columna "Definida en" cuenta el **origen histórico** (`sql/legacy/00N`). Un cambio nuevo se escribe como `db/migrations/000N_<slug>.sql`, se aplica en dev y llega a prod solo por release ([`db/README.md`](../../db/README.md)). Este inventario vale para **los dos ambientes**: prod reproduce el mismo esquema, y lo comprueba la huella de `db/verify/post-deploy.sql`.
 
 ## Resumen
 
@@ -67,9 +69,16 @@ Corren con los permisos de su dueño (`postgres`), así que **no las limita RLS*
 
 `anon` y `authenticated` tienen en las 3 tablas los grants por defecto de Supabase (`SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER`). **No son los que protegen los datos**: con RLS activo, lo que decide es la política. `TRUNCATE` no está sujeto a RLS, pero la API de Supabase (PostgREST) no lo expone. Revocar los grants sobrantes queda para la auditoría de grants (fuera del spec 16).
 
+## Schema `ops` — ledger de migraciones (spec 18)
+
+| Objeto | Qué es | Acceso |
+|---|---|---|
+| schema `ops` | Interno, para operación de la base. **No** está en los schemas expuestos de PostgREST. | `revoke all … from public, anon, authenticated`. Verificado en dev: `has_schema_privilege('anon'/'authenticated', 'ops', 'USAGE') = false`. |
+| `ops.migration_log(version, applied_at, checksum)` | Qué migraciones de `db/migrations/` se aplicaron en este ambiente. | `revoke all … from public, anon, authenticated`. Sin RLS: no hace falta, porque sin `USAGE` sobre el schema ningún rol de la API llega a la tabla. Solo la escriben los releases (`postgres` desde el SQL Editor o el MCP). |
+
 ## Cómo regenerar
 
-Con el MCP de Supabase (`execute_sql`):
+Con el MCP de Supabase (`execute_sql`, **dev**). En prod, las mismas consultas se pegan en el SQL Editor:
 
 ```sql
 -- RLS por tabla

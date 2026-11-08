@@ -11,9 +11,10 @@ automatizan, para cuando necesites entender o revisar lo que hicieron.
    ya definido en la tabla `games` de Supabase (`lib/games.ts`, `getGames()`)
    — no se inventa uno nuevo. **Si el juego todavía no tiene fila en
    `games`**, hay que crearla antes de poder guardar cualquier puntaje
-   (`scores.game_id` tiene una FK a `games(id)`): una migración versionada en
-   `sql/00N_add_game_<id>.sql` aplicada con el MCP de Supabase
-   (`apply_migration`), igual que hicieron las specs 04/05/06. Esa fila
+   (`scores.game_id` tiene una FK a `games(id)`): una fila más en el seed
+   compartido `db/seeds/shared/games.sql`, aplicada en dev con el MCP de
+   Supabase (`execute_sql`). Prod la recibe con el próximo release
+   (`db/README.md`, spec 18). Esa fila
    también necesita una portada: `cover` es el nombre de una clase CSS
    (`.cover-<slug>`, no una imagen) que se agrega a la sección "Cover art
    generators" de `app/globals.css`, siguiendo el mismo patrón de gradientes
