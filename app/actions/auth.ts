@@ -74,9 +74,11 @@ export async function signUp(
     options: { data: { username }, emailRedirectTo: await callbackUrl(next) },
   });
 
-  // Correo ya registrado: misma respuesta que un alta nueva, para no revelar qué
-  // cuentas existen. Con "Confirm email" activado Supabase ni siquiera devuelve
-  // este error; esto cubre el caso de que se vuelva a apagar.
+  // Correo ya registrado: no mostrar "ese correo ya tiene una cuenta". Solo oculta
+  // el mensaje: la respuesta es neutral de verdad gracias a "Confirm email" en
+  // Supabase (con él, este error ni llega). Si se apagara, un alta nueva entra
+  // directo y esta rama muestra "REVISA TU CORREO": la diferencia vuelve a
+  // revelar qué correos existen (spec 17/18).
   if (error?.code === "user_already_exists") {
     return { notice: "check-email" };
   }
