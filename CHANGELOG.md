@@ -6,6 +6,25 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Ca
 corresponde a un spec (`specs/NN-slug-vX.Y.Z.md`) — ver ese spec para el detalle completo de
 alcance, decisiones y criterios de aceptación.
 
+## [0.8.0] - 2026-11-08
+
+Spec: [`18-ambientes-dev-prod-migracion-v0.8.0`](specs/18-ambientes-dev-prod-migracion-v0.8.0.md)
+
+### Added
+
+- **Ambientes dev y prod separados.** Carpeta `db/` con lo común (esquema en `db/migrations/`, catálogo de juegos en `db/seeds/shared/`, verificación en `db/verify/`) y una carpeta por ambiente (`db/environments/dev` y `prod`), cada una con su configuración de Auth y su plantilla de variables. El manual está en `db/README.md`.
+- **Pase a prod con un solo script SQL.** `npm run db:release` genera en `db/environments/prod/releases/` el archivo que se pega en el SQL Editor de prod. Corre en una sola transacción y, si se pega dos veces, la segunda no hace nada. Nunca lleva usuarios, scores ni claves.
+- `db/verify/post-deploy.sql`: una "huella" del esquema, la seguridad y el catálogo. Si da igual en dev y en prod, los dos ambientes coinciden.
+- Plantillas `.env.example` (raíz y una por ambiente).
+
+### Changed
+
+- La app valida sus variables al arrancar y no deja levantar un build de producción que apunte a la base de dev. El ambiente lo indica `NEXT_PUBLIC_APP_ENV`.
+- Los enlaces de los correos de registro y de recuperación usan la URL pública del sitio (`NEXT_PUBLIC_SITE_URL`) en vez de `localhost`.
+- El remitente del formulario de contacto se configura por ambiente (`RESEND_FROM`).
+- Las variables de desarrollo pasan de `.env.local` a `.env.development.local`, así un `next build` local ya no las toma.
+- `sql/` pasa a `sql/legacy/` (solo histórico). El esquema actual está consolidado en `db/migrations/0000_baseline.sql`.
+
 ## [0.7.1] - 2026-11-02
 
 Spec: [`17-correcciones-auditoria-seguridad-v0.7.1`](specs/17-correcciones-auditoria-seguridad-v0.7.1.md)

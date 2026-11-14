@@ -70,9 +70,10 @@ select id, title, cat, cover, color, sort_order from games order by sort_order;
 ```
 
 vía el MCP de Supabase (`mcp__supabase__execute_sql`). Si el MCP no responde
-o no está disponible, caer a `sql/004_recreate_games_table.sql` (más
-cualquier `sql/00N_add_game_*.sql` posterior) y decirle al usuario que estás
-trabajando con el archivo, no con la base real, por si difieren.
+o no está disponible, caer a `db/seeds/shared/games.sql` (el catálogo
+versionado, spec 18) y decirle al usuario que estás trabajando con el archivo,
+no con la base real, por si difieren. El MCP apunta a **dev**; prod no se
+consulta nunca.
 
 ## Fase 2 — Clasificar el juego
 
@@ -86,7 +87,7 @@ artefactos:
 | -------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | **A — Port**                           | Tiene fila en `games` **y** hay una fuente en `references/started-games/` que le corresponde | motor + línea en `registry.ts`                                                                                           |
 | **B — Desde cero, catálogo existente** | Tiene fila en `games`, sin fuente de referencia                                              | motor + línea en `registry.ts`                                                                                           |
-| **C — Juego nuevo**                    | No existe fila en `games` para ese slug                                                      | motor + `registry.ts` + `sql/00N_add_game_<id>.sql` + (si el cover es nuevo) bloque `.cover-<slug>` en `app/globals.css` |
+| **C — Juego nuevo**                    | No existe fila en `games` para ese slug                                                      | motor + `registry.ts` + fila en `db/seeds/shared/games.sql` + (si el cover es nuevo) bloque `.cover-<slug>` en `app/globals.css` |
 
 Mapeo de partida conocido (confirmalo contra el catálogo en vivo, no lo
 asumas si pasó tiempo desde que se escribió este skill):

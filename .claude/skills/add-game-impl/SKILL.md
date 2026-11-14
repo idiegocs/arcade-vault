@@ -101,17 +101,22 @@ esperar confirmación explícita.
 **Orden que no se reordena** — la fila de `games` tiene que existir antes de
 que cualquier score se pueda guardar (FK `scores_game_id_fkey`):
 
-1. **(Solo caso C — juego nuevo)** Crear `sql/00N_add_game_<id>.sql` con
-   `insert into games (...) values (...) on conflict (id) do nothing;`
-   — idempotente, nunca un `INSERT` a secas ni tocar filas existentes
-   (siguiendo el estilo minúsculas de `sql/004_recreate_games_table.sql`).
-   Antes de fijar `sort_order`, releer el catálogo en vivo
-   (`select max(sort_order) from games`) por si el spec quedó desactualizado
-   entre diseño e implementación — usar `max + 1`, no el número que asumió
-   el spec si ya no es el máximo. Aplicar con `mcp__supabase__apply_migration`.
-   Verificar con `mcp__supabase__list_tables` y `mcp__supabase__get_advisors`
-   (tipo `security`) — no debe haber hallazgos nuevos. Test manual:
-   `select * from games where id = '<id>'` devuelve la fila esperada.
+1. **(Solo caso C — juego nuevo)** Agregar la fila al seed compartido
+   `db/seeds/shared/games.sql` (spec 18: el catálogo vive ahí, no en una
+   migración): una tupla más en el `values` del upsert, en el orden de
+   `sort_order`. No crear archivos en `sql/` (es histórico) ni una migración
+   en `db/migrations/` para un juego. Antes de fijar `sort_order`, releer el
+   catálogo en vivo (`select max(sort_order) from games`) por si el spec quedó
+   desactualizado entre diseño e implementación — usar `max + 1`, no el número
+   que asumió el spec si ya no es el máximo. Aplicar **solo en dev** con
+   `mcp__supabase__execute_sql`, con el contenido completo del seed (es un
+   upsert, así que reaplica las filas existentes sin cambiarlas). **Nunca**
+   contra prod: prod lo recibe en el próximo `npm run db:release`
+   (`db/README.md`). Verificar con `mcp__supabase__get_advisors` (tipo
+   `security`): no debe haber hallazgos nuevos. Test manual:
+   `select * from games where id = '<id>'` devuelve la fila esperada, y
+   `node scripts/build-prod-release.mjs --stdout > /dev/null` pasa (valida que
+   todo id de `registry.ts` esté en el seed).
 2. **(Solo si el cover es nuevo)** Agregar el bloque `.cover-<slug>` a la
    sección "Cover art generators" de `app/globals.css`, siguiendo el patrón
    de los 8 covers existentes (gradientes/`::before`/`::after` con los

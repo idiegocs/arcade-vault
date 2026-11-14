@@ -3,7 +3,7 @@
 > Implementado en el spec [16](../../specs/16-endurecimiento-seguridad-rutas-v0.7.0.md) (v0.7.0, 2026-10-25). Inventario de políticas: [`politicas-rls.md`](politicas-rls.md).
 > Auditoría periódica: [`@security-guardian`](../../.claude/agents/security-guardian.md) (completo o `diff`), solo reporta; reportes en [`auditorias/`](auditorias/).
 
-- [x] RLS: Row Level Security habilitado en ambas tablas: `games` y `scores` — también en `profiles`. Políticas de escritura con `(select auth.uid())` y rol `authenticated` (`sql/007_endurecimiento_rls.sql`).
+- [x] RLS: Row Level Security habilitado en ambas tablas: `games` y `scores` — también en `profiles`. Políticas de escritura con `(select auth.uid())` y rol `authenticated` (`sql/007_endurecimiento_rls.sql`, hoy en `db/migrations/0000_baseline.sql`).
 - [x] Minimum password length — mínimo 8 caracteres (Supabase Auth + `MIN_PASSWORD` en `app/actions/auth.ts`). Además, Supabase exige minúsculas, mayúsculas y dígitos.
 - [x] Leaked password protection — el toggle de Supabase es solo del plan Pro (proyecto en Free): **cubierto en la app** con la API Pwned Passwords de HaveIBeenPwned (`lib/pwned-password.ts`, k-anonymity, fail-open) en registro y restablecer contraseña. El advisor `auth_leaked_password_protection` sigue en WARN por eso.
 - [x] Max signup rate — 10 por IP (Supabase Auth → Rate Limits, ventana de 5 min).
@@ -15,6 +15,12 @@
   - `/api/contact` validado, sin el error crudo de Resend (H3).
   - `server-only` en `lib/supabase/admin.ts` y `lib/pwned-password.ts` (K10).
   - `poweredByHeader: false` (H5).
+- [x] _(Spec [18](../../specs/18-ambientes-dev-prod-migracion-v0.8.0.md), v0.8.0)_ Ambientes separados:
+  - Las variables de cada ambiente se validan al arrancar (`lib/env.public.ts`, `lib/env.ts`, `next.config.ts`). Un build con `NEXT_PUBLIC_APP_ENV=production` que apunte a la base de dev no arranca.
+  - Los enlaces de los correos de Auth se arman con `NEXT_PUBLIC_SITE_URL`, que tiene que coincidir con las Redirect URLs del proyecto. Ya no está el fallback a `localhost`.
+  - Prod sin MCP ni CLI. Su base cambia solo con releases generados (`db/`), y los agentes trabajan solo contra dev.
+  - Usuarios, scores, keys y apps OAuth nunca se copian entre ambientes. Checklist de Auth de prod: `db/environments/prod/auth-config.md`.
+  - Schema `ops` (ledger) sin acceso para `anon` ni `authenticated`.
 
 Ej. (referencia original):
 

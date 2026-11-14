@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
+import { supabaseAdminEnv } from "@/lib/env";
 
 /**
  * Cliente con la secret key (rol `service_role`): salta RLS y puede ejecutar
@@ -8,14 +9,9 @@ import { createClient as createSupabaseClient, type SupabaseClient } from "@supa
  * Sin cookies ni sesión: no actúa en nombre de ningún usuario.
  */
 export function createAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const { supabaseUrl, secretKey } = supabaseAdminEnv();
 
-  if (!url || !secretKey) {
-    throw new Error("Faltan NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY en .env.local");
-  }
-
-  return createSupabaseClient(url, secretKey, {
+  return createSupabaseClient(supabaseUrl, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

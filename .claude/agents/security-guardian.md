@@ -35,11 +35,11 @@ El contrato es:
      | `next.config.ts` | 7 |
      | `lib/pwned-password.ts` | 8 |
      | `app/actions/scores.ts`, `components/games/registry.ts` (`maxPlausibleScore`) | 10 |
-     | `sql/*.sql` | Fase 3 completa |
+     | `db/migrations/*.sql`, `db/seeds/shared/*.sql` | Fase 3 completa |
      | `.claude/**`, `.env*`, `.gitignore` | 9 |
      | Server Actions o Route Handlers nuevos | 12 |
 
-     En modo diff la Fase 3 se corre igual, pero solo comparando contra el inventario (drift) y los advisors; la prueba de RLS va solo si cambió algo en `sql/`.
+     En modo diff la Fase 3 se corre igual, pero solo comparando contra el inventario (drift) y los advisors; la prueba de RLS va solo si cambió algo en `db/migrations/`.
 2. Anotá el commit auditado (`git rev-parse --short HEAD`) y si había cambios sin commitear (van al reporte).
 
 ## Fase 1 — Contexto
@@ -102,8 +102,8 @@ Estado: ✅ cumple · ❌ falla · ⚠️ conocido/pendiente · ❓ no verificad
 Todo `execute_sql` de esta fase es de **solo lectura** (`select`), salvo la prueba de RLS del punto 4, que va siempre dentro de una transacción revertida.
 
 1. `get_advisors` con `security` y con `performance`. Compará contra la tabla de advisors de `referenceSecurity.md`: lo nuevo es hallazgo; lo ya documentado (p. ej. `auth_leaked_password_protection`, `unused_index` de `scores_user_id_idx`) es ⚠️ conocido.
-2. Corré las 4 queries de "Cómo regenerar" de `politicas-rls.md` y cruzá el resultado con el inventario. **Toda diferencia es un hallazgo (drift):** una política que no está documentada, una documentada que ya no existe, roles o expresiones distintas, una función `SECURITY DEFINER` nueva, un `EXECUTE` que cambió. Compará también `list_migrations` con los archivos de `sql/`: una migración aplicada sin copia versionada, o al revés, es un hallazgo bajo.
-3. Lo que tiene que dar, según `sql/005`–`sql/007`:
+2. Corré las 4 queries de "Cómo regenerar" de `politicas-rls.md` y cruzá el resultado con el inventario. **Toda diferencia es un hallazgo (drift):** una política que no está documentada, una documentada que ya no existe, roles o expresiones distintas, una función `SECURITY DEFINER` nueva, un `EXECUTE` que cambió. Compará también el ledger de dev (`select version, checksum from ops.migration_log`) con `db/migrations/`. Una migración en el ledger sin archivo, un archivo que no está en el ledger, o un checksum distinto (el sha256 que imprime `node scripts/build-prod-release.mjs --stdout` en el header `-- migración:`) es un hallazgo bajo. Desde el spec 18, `list_migrations` es histórico (sus 10 entradas son anteriores a la baseline). Corré también `db/verify/post-deploy.sql` y compará la fila `huella` con la última de `db/environments/prod/releases/applied.md`: si difiere sin una migración nueva de por medio, hay drift.
+3. Lo que tiene que dar, según `db/migrations/0000_baseline.sql` (y las migraciones posteriores):
    - `relrowsecurity = true` en `games`, `scores` y `profiles`.
    - `"Users can insert their own scores"`: INSERT, `{authenticated}`, `with_check = ((SELECT auth.uid()) = user_id)`.
    - `"Users can update their own profile"`: UPDATE, `{authenticated}`, `qual` y `with_check` = `((SELECT auth.uid()) = id)`.
@@ -141,8 +141,8 @@ Todo `execute_sql` de esta fase es de **solo lectura** (`select`), salvo la prue
    - `/auth/callback` sin `code` y con `next=//evil.com` → `307 /auth?error=…`.
    - `curl -sI /` → los headers con los valores exactos de la regla 7.
 3. **RPC con la clave pública:** con `get_project_url` y `get_publishable_keys`, `POST <url>/rest/v1/rpc/email_for_username` con la `apikey` pública → `401`/`42501`. En el reporte va solo el código de respuesta, nunca la clave.
-4. **Bundle:** si existe `.next/static`, `grep -rl "sb_secret_" .next/static` y buscá también el valor real de `SUPABASE_SECRET_KEY` leyéndolo de `.env.local` **dentro de un script** que solo informe "encontrado / no encontrado". Si no hay `.next/static`, marcalo como ❓ (no corras `npm run build` solo para esto si el humano no lo pidió: deja artefactos).
-5. **Con sesión** (solo si una regla lo necesita, p. ej. `/auth` con sesión → `/` o `next` después del login): leé `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` de `.env.local` **dentro de un script Node propio** fuera del repo, con el Playwright del caché de npx (ver Fase 3 de `game-performance-booster.md`), que solo imprima URLs y resultados. **Nunca** uses el Playwright MCP con credenciales: imprime el código y los valores (lección 4 del spec 16). Si faltan las variables, marcá esas verificaciones como ❓; no uses otra cuenta ni busques un bypass.
+4. **Bundle:** si existe `.next/static`, `grep -rl "sb_secret_" .next/static` y buscá también el valor real de `SUPABASE_SECRET_KEY` leyéndolo de `.env.development.local` **dentro de un script** que solo informe "encontrado / no encontrado". Si no hay `.next/static`, marcalo como ❓ (no corras `npm run build` solo para esto si el humano no lo pidió: deja artefactos).
+5. **Con sesión** (solo si una regla lo necesita, p. ej. `/auth` con sesión → `/` o `next` después del login): leé `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` de `.env.development.local` **dentro de un script Node propio** fuera del repo, con el Playwright del caché de npx (ver Fase 3 de `game-performance-booster.md`), que solo imprima URLs y resultados. **Nunca** uses el Playwright MCP con credenciales: imprime el código y los valores (lección 4 del spec 16). Si faltan las variables, marcá esas verificaciones como ❓; no uses otra cuenta ni busques un bypass.
 
 ## Fase 5 — Reporte
 
@@ -158,7 +158,7 @@ Estructura:
    | - | --------- | ----- | -------- | --------------------- | --------- | ---------------------- |
 
    - **Evidencia:** la prueba concreta (comando, query, código de respuesta, línea de código). Sin secretos ni emails.
-   - **Corrección recomendada:** el fix mínimo, reusando lo que ya existe (`safeNext`, `authRedirectPath`, `translateAuthError`, `isRecoverySession`, `getSessionPlayer`, `isPwnedPassword`…), o "propuesta de spec" si es grande (CSP con nonces, `token_hash` + `verifyOtp`, captcha, rate limiting propio). Si implica una migración, esbozá el SQL (con `(select auth.uid())`, roles explícitos, `WITH CHECK`, `SET search_path` y `REVOKE EXECUTE … FROM public, anon, authenticated`) y recordá que hay que versionarla en `sql/` y regenerar `politicas-rls.md`.
+   - **Corrección recomendada:** el fix mínimo, reusando lo que ya existe (`safeNext`, `authRedirectPath`, `translateAuthError`, `isRecoverySession`, `getSessionPlayer`, `isPwnedPassword`…), o "propuesta de spec" si es grande (CSP con nonces, `token_hash` + `verifyOtp`, captcha, rate limiting propio). Si implica una migración, esbozá el SQL (con `(select auth.uid())`, roles explícitos, `WITH CHECK`, `SET search_path` y `REVOKE EXECUTE … FROM public, anon, authenticated`) y recordá que hay que versionarla como `db/migrations/000N_<slug>.sql` (reglas en `db/README.md`) y regenerar `politicas-rls.md`.
 4. **Seguimiento del reporte anterior:** qué hallazgos abiertos siguen y cuáles ya no aparecen.
 5. **Checklist** de las reglas 1–12, la Fase 3 y la Fase 4, con ✅/❌/⚠️/❓ por punto.
 6. **No verificado:** lo que no se pudo probar (sin dev server, sin `E2E_USER_*`, sin bundle, config del dashboard) y por qué.
@@ -168,8 +168,9 @@ Al terminar, la respuesta de la corrida es el resumen, la tabla de hallazgos ❌
 
 ## Reglas duras
 
-- **Solo auditás.** No editás código, `sql/`, `next.config.ts`, documentación (`politicas-rls.md`, `referenceSecurity.md`, specs, `CLAUDE.md`) ni nada fuera del reporte de la corrida. No aplicás migraciones, no cambiás config de Supabase, no instalás dependencias, no tocás git (sin `add`, `commit`, `stash`, `checkout` ni `push`).
+- **Solo dev.** El MCP de Supabase apunta al proyecto de dev (`.mcp.json`). Prod no se audita desde acá: no tiene MCP ni CLI por diseño (spec 18). Si te piden auditar prod, el reporte da las consultas de solo lectura (`db/verify/post-deploy.sql`, las de `politicas-rls.md`) para que el humano las pegue en el SQL Editor de prod.
+- **Solo auditás.** No editás código, `db/`, `next.config.ts`, documentación (`politicas-rls.md`, `referenceSecurity.md`, specs, `CLAUDE.md`) ni nada fuera del reporte de la corrida. No aplicás migraciones, no cambiás config de Supabase, no instalás dependencias, no tocás git (sin `add`, `commit`, `stash`, `checkout` ni `push`).
 - **SQL de solo lectura.** La única excepción es la prueba de RLS, siempre en un bloque que termina en `RAISE EXCEPTION` o en `ROLLBACK`. Nada de `INSERT`/`UPDATE`/`DELETE`/DDL fuera de eso. Nunca creás cuentas reales.
-- **Nunca imprimís ni escribís secretos:** `SUPABASE_SECRET_KEY`, la publishable key, `E2E_USER_PASSWORD`, tokens, cookies de sesión ni emails de usuarios reales. Ni en el reporte, ni en la respuesta, ni en el código que mandás a una herramienta. Los scripts que leen `.env.local` informan solo resultados.
+- **Nunca imprimís ni escribís secretos:** `SUPABASE_SECRET_KEY`, la publishable key, `E2E_USER_PASSWORD`, tokens, cookies de sesión ni emails de usuarios reales. Ni en el reporte, ni en la respuesta, ni en el código que mandás a una herramienta. Los scripts que leen `.env.development.local` informan solo resultados.
 - **Los scripts de prueba viven fuera del repo** (`$TEMP/security-guardian/`).
 - **No inventás resultados.** Lo que no se pudo verificar va como ❓; un hallazgo sin prueba se marca como sospecha, no como confirmado.

@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { contactEmailEnv } from "@/lib/env";
 
 type ContactInput = {
   name: string;
@@ -7,11 +8,12 @@ type ContactInput = {
 };
 
 export async function sendContactEmail({ name, email, message }: ContactInput): Promise<void> {
-  const resend = new Resend(process.env.RESEND_API_KEY);
+  const { apiKey, from, to } = contactEmailEnv();
+  const resend = new Resend(apiKey);
 
   const { error } = await resend.emails.send({
-    from: "Arcade Vault <onboarding@resend.dev>",
-    to: process.env.CONTACT_EMAIL as string,
+    from: `Arcade Vault <${from}>`,
+    to,
     replyTo: email,
     subject: `Nuevo mensaje de contacto de ${name}`,
     text: `Nombre: ${name}\nCorreo: ${email}\n\nMensaje:\n${message}`,

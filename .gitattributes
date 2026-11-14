@@ -1,0 +1,4 @@
+# SQL siempre con LF (spec 18): Postgres guarda los cuerpos de función tal cual
+# y db/verify/post-deploy.sql compara su md5 entre ambientes. Con CRLF, un `\r`
+# dentro del cuerpo haría que dev y prod no coincidan.
+*.sql text eol=lf

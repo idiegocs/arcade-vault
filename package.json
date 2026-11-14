@@ -1,12 +1,13 @@
 {
   "name": "arcade-vault",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:release": "node scripts/build-prod-release.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

@@ -43,7 +43,7 @@ no un fix ni un cambio interno.
 - `components/games/registry.ts`: agrega la entrada `<id>: { load: () => import("./<id>/<archivo>").then((m) => m.create<Nombre>Engine), maxPlausibleScore: <techo> }` — `<techo>` exacto si el juego tiene un final enumerable, "techo de cordura" si es sin fin (ver spec `11-score-plausibility-caps-v0.2.5`).
 - (Si el juego tiene sonido) presets propios dentro del motor con `defineSounds` + `beep` de `components/games/audio.ts` — `audio.ts` no se modifica.
 - Skins `clasico` (default), `neon` y `retro` dentro del motor, según `components/games/README.md` § Skins (patrón de CAÍDA), y `skins: ["clasico", "neon", "retro"]` en su entrada de `registry.ts`. Si la infraestructura de skins todavía no existe, correr antes `@skin-designer caida`.
-- (Solo caso C) `sql/00N_add_game_<id>.sql`: `insert ... on conflict (id) do nothing` de la fila `<id>` en `games` (title, short, long, cat, cover, color, sort_order) — idempotente, nunca un `INSERT` a secas ni un `DROP`/`UPDATE` de filas existentes. Aplicado al proyecto real vía el MCP de Supabase (`apply_migration`), igual que specs 04/05/06.
+- (Solo caso C) `db/seeds/shared/games.sql`: una tupla más en el upsert del catálogo con la fila `<id>` (title, short, long, cat, cover, color, sort_order). Es idempotente y nunca borra (spec 18). Se aplica **solo en dev** con el MCP de Supabase (`execute_sql` con el seed completo). Prod la recibe en el próximo `npm run db:release`.
 - (Solo si el cover es nuevo) bloque `.cover-<slug>` en `app/globals.css`, sección "Cover art generators".
 - `package.json`: version X.Y.Z → X.Y+1.0.
 - `CHANGELOG.md`: entrada para X.Y+1.0 enlazando a este spec.
@@ -86,7 +86,7 @@ flowchart LR
 ```
 
 Caso **C** agrega también un `erDiagram` con la fila nueva insertándose en la
-tabla `games` ya existente (mismos campos que `sql/004_recreate_games_table.sql`).
+tabla `games` ya existente (mismos campos que `db/migrations/0000_baseline.sql`).
 
 Si el feature no introduce estructuras nuevas más allá de lo anterior,
 decirlo explícitamente en vez de omitir la sección.
@@ -101,7 +101,7 @@ cualquier score se pueda guardar):
 ```markdown
 ## Plan de implementación
 
-1. (Solo caso C) `sql/00N_add_game_<id>.sql` con `insert ... on conflict (id) do nothing` de la fila. Aplicar con el MCP de Supabase (`apply_migration`) y verificar con `list_tables`/`get_advisors`. Test manual: `select * from games where id = '<id>'` devuelve la fila.
+1. (Solo caso C) Agregar la fila a `db/seeds/shared/games.sql`. Aplicar el seed en dev con el MCP de Supabase (`execute_sql`) y verificar con `get_advisors` y con `node scripts/build-prod-release.mjs --stdout`, que valida que los ids de `registry.ts` estén en el seed. Test manual: `select * from games where id = '<id>'` devuelve la fila.
 2. (Solo si el cover es nuevo) bloque `.cover-<slug>` en `app/globals.css`. Test manual: `/games` muestra la portada nueva (aunque el juego todavía no tenga motor, la fila ya existe y la card se renderiza).
 3. Esqueleto del motor en `components/games/<id>/<archivo>.ts`: factory, `ctx`, los 6 métodos del `EngineHandle`, el loop RAF, `reportState()` sin lógica de juego todavía. Test manual: `npm run lint`.
 4. [n pasos de mecánica del juego, cada uno ≤ 30-50 líneas]. Test manual: [acción concreta jugable].

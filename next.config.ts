@@ -1,5 +1,12 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { publicEnv } from "./lib/env.public";
+
+// Valida las variables del ambiente al arrancar `next dev`, `next build` y
+// `next start` (spec 18). Faltantes o un build de prod que apunte a la base de
+// dev cortan acá, con el mensaje de lib/env.public.ts, en vez de fallar a mitad
+// de una request.
+publicEnv();
 
 // Headers de seguridad (spec 16). Van acá y no en proxy.ts porque el matcher
 // del proxy excluye _next/static y las imágenes. HSTS sin `preload` (difícil de
